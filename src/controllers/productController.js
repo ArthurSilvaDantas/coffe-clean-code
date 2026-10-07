@@ -4,17 +4,26 @@ const productRepository = require('../repositories/productRepository');
 exports.create = (req, res) => {
   const { name, price, stock, category } = req.body || {};
   if (!name || name.trim() == '') return res.status(400).json({ error: 'Nome é obrigatório' });
-  if (price == undefined || typeof price !== 'number' || price <= 0) return res.status(400).json({ error: 'Preço inválido' });
+  if (price == undefined || typeof price !== 'number' || price <= 0)
+    return res.status(400).json({ error: 'Preço inválido' });
   if (price > 500) return res.status(400).json({ error: 'Preço acima do permitido' });
 
   let s = stock;
   if (s === undefined) s = 0;
-  if (typeof s !== 'number' || s < 0 || s > 200) return res.status(400).json({ message: 'Estoque inválido' });
+  if (typeof s !== 'number' || s < 0 || s > 200)
+    return res.status(400).json({ message: 'Estoque inválido' });
 
   const cat = category || 'coffee';
-  if (cat != 'coffee' && cat != 'food' && cat != 'drink') return res.status(400).json({ message: 'Categoria inválida' });
+  if (cat != 'coffee' && cat != 'food' && cat != 'drink')
+    return res.status(400).json({ message: 'Categoria inválida' });
 
-  const p = productRepository.addProduct({ name: name.trim(), price, stock: s, category: cat, active: true });
+  const p = productRepository.addProduct({
+    name: name.trim(),
+    price,
+    stock: s,
+    category: cat,
+    active: true,
+  });
   res.status(201).json(p);
 };
 

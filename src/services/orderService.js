@@ -116,7 +116,8 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
 function handle(req, res) {
   const o = orderRepository.getPurchase(req.params.id);
   if (!o) return res.status(404).json({ error: 'Pedido não encontrado' });
-  if (o.status != 'CREATED') return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
+  if (o.status != 'CREATED')
+    return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
 
   const productId = req.body.productId;
   const qty = req.body.quantity;
@@ -137,7 +138,8 @@ function handle(req, res) {
   if (existing) total = existing.qty + qty;
   if (total > 10) return res.status(400).json({ error: 'Máximo de 10 unidades por produto' });
   if (p.stock < qty) return res.status(409).json({ error: 'Estoque insuficiente para ' + p.name });
-  if (!existing && o.items.length >= 15) return res.status(400).json({ error: 'Limite de itens atingido' });
+  if (!existing && o.items.length >= 15)
+    return res.status(400).json({ error: 'Limite de itens atingido' });
 
   // diminui o estoque
   p.stock = p.stock - qty;
