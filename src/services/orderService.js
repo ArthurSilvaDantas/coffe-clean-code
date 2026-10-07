@@ -5,10 +5,10 @@ const orderRepository = require('../repositories/orderRepository');
 
 function doCalc(o) {
   const subtotal = helpers.calc(o.items);
-  const client = db.customers.find((c) => c.id == o.clientId);
+  const client = db.customers.find((c) => c.id === o.clientId);
   let discount = 0;
 
-  if (client.type == 'premium') {
+  if (client.type === 'premium') {
     discount = subtotal * 0.1;
   } else {
     if (subtotal >= 100) {
@@ -17,9 +17,9 @@ function doCalc(o) {
   }
 
   if (o.coupon) {
-    if (o.coupon == 'CAFE10') {
+    if (o.coupon === 'CAFE10') {
       discount = discount + subtotal * 0.1;
-    } else if (o.coupon == 'BEMVINDO') {
+    } else if (o.coupon === 'BEMVINDO') {
       discount = discount + 5;
     }
   }
@@ -29,8 +29,8 @@ function doCalc(o) {
   }
 
   let fee = 0;
-  if (o.deliveryType == 'delivery') {
-    if (client.type == 'premium' || subtotal >= 50 || o.coupon == 'FRETEGRATIS') {
+  if (o.deliveryType === 'delivery') {
+    if (client.type === 'premium' || subtotal >= 50 || o.coupon === 'FRETEGRATIS') {
       fee = 0;
     } else {
       fee = 7;
@@ -48,7 +48,7 @@ function doCalc(o) {
 }
 
 function createOrder(customerId, deliveryType, distance, address, notes, items) {
-  const customer = db.customers.find((c) => c.id == customerId);
+  const customer = db.customers.find((c) => c.id === Number(customerId));
   if (!customer) {
     return { error: 'Cliente não encontrado', status: 404 };
   }
@@ -57,14 +57,14 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   }
 
   const type = deliveryType || 'pickup';
-  if (type != 'pickup' && type != 'delivery') {
+  if (type !== 'pickup' && type !== 'delivery') {
     return { error: 'Tipo de entrega inválido', status: 400 };
   }
-  if (type == 'delivery') {
+  if (type === 'delivery') {
     if (!address) {
       return { error: 'Endereço é obrigatório para entrega', status: 400 };
     }
-    if (distance == undefined || distance <= 0) {
+    if (distance === undefined || distance <= 0) {
       return { error: 'Distância inválida', status: 400 };
     } else if (distance > 10) {
       return { error: 'Endereço fora da área de entrega', status: 400 };
@@ -75,7 +75,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     clientId: customer.id,
     items: [],
     deliveryType: type,
-    distance: type == 'delivery' ? distance : 0,
+    distance: type === 'delivery' ? distance : 0,
     address: address || null,
     notes: notes || '',
     coupon: null,
@@ -99,7 +99,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     }
     for (const it of items) {
       const p = productRepository.decreaseStock(it.productId, it.quantity);
-      const existing = order.items.find((i) => i.productId == p.id);
+      const existing = order.items.find((i) => i.productId === p.id);
       if (existing) {
         existing.qty = existing.qty + it.quantity;
       } else {
@@ -116,19 +116,21 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
 function handle(req, res) {
   const o = orderRepository.getPurchase(req.params.id);
   if (!o) return res.status(404).json({ error: 'Pedido não encontrado' });
-  if (o.status != 'CREATED') return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
+  if (o.status !== 'CREATED') {
+    return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
+  }
 
   const productId = req.body.productId;
   const qty = req.body.quantity;
   if (!productId) return res.status(400).json({ message: 'productId é obrigatório' });
   if (!qty || qty <= 0) return res.status(400).json({ message: 'Quantidade inválida' });
 
-  const p = db.products.find((x) => x.id == productId);
+  const p = db.products.find((x) => x.id === Number(productId));
   if (!p || !p.active) return res.status(404).json({ error: 'Produto não encontrado' });
 
   let existing = null;
   for (let i = 0; i < o.items.length; i++) {
-    if (o.items[i].productId == p.id) {
+    if (o.items[i].productId === p.id) {
       existing = o.items[i];
     }
   }
@@ -137,7 +139,9 @@ function handle(req, res) {
   if (existing) total = existing.qty + qty;
   if (total > 10) return res.status(400).json({ error: 'Máximo de 10 unidades por produto' });
   if (p.stock < qty) return res.status(409).json({ error: 'Estoque insuficiente para ' + p.name });
-  if (!existing && o.items.length >= 15) return res.status(400).json({ error: 'Limite de itens atingido' });
+  if (!existing && o.items.length >= 15) {
+    return res.status(400).json({ error: 'Limite de itens atingido' });
+  }
 
   // diminui o estoque
   p.stock = p.stock - qty;
@@ -167,17 +171,17 @@ function applyCoupon(orderId, code) {
 
   const c = (code || '').toUpperCase().trim();
   const validCoupons = ['CAFE10', 'BEMVINDO', 'FRETEGRATIS'];
-  if (validCoupons.indexOf(c) == -1) {
+  if (validCoupons.indexOf(c) === -1) {
     const err = new Error('Cupom inválido');
     err.status = 400;
     throw err;
   }
-  if (c == 'BEMVINDO' && orderRepository.hasPaidPurchases(o.clientId)) {
+  if (c === 'BEMVINDO' && orderRepository.hasPaidPurchases(o.clientId)) {
     const err = new Error('Cupom válido apenas para a primeira compra');
     err.status = 400;
     throw err;
   }
-  if (c == 'FRETEGRATIS' && o.deliveryType != 'delivery') {
+  if (c === 'FRETEGRATIS' && o.deliveryType !== 'delivery') {
     const err = new Error('Cupom válido apenas para pedidos com entrega');
     err.status = 400;
     throw err;
