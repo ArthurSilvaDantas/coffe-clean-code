@@ -101,9 +101,9 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
       const p = productRepository.decreaseStock(it.productId, it.quantity);
       const existing = order.items.find((i) => i.productId === p.id);
       if (existing) {
-        existing.qty = existing.qty + it.quantity;
+        existing.quantity = existing.quantity + it.quantity;
       } else {
-        order.items.push({ productId: p.id, name: p.name, price: p.price, qty: it.quantity });
+        order.items.push({ productId: p.id, name: p.name, price: p.price, quantity: it.quantity });
       }
     }
   }
@@ -121,9 +121,9 @@ function handle(req, res) {
   }
 
   const productId = req.body.productId;
-  const qty = req.body.quantity;
+  const quantity = req.body.quantity;
   if (!productId) return res.status(400).json({ message: 'productId é obrigatório' });
-  if (!qty || qty <= 0) return res.status(400).json({ message: 'Quantidade inválida' });
+  if (!quantity || quantity <= 0) return res.status(400).json({ message: 'Quantidade inválida' });
 
   const p = db.products.find((x) => x.id === Number(productId));
   if (!p || !p.active) return res.status(404).json({ error: 'Produto não encontrado' });
@@ -135,21 +135,25 @@ function handle(req, res) {
     }
   }
 
-  let total = qty;
-  if (existing) total = existing.qty + qty;
-  if (total > 10) return res.status(400).json({ error: 'Máximo de 10 unidades por produto' });
-  if (p.stock < qty) return res.status(409).json({ error: 'Estoque insuficiente para ' + p.name });
+  let totalQuantity = quantity;
+  if (existing) totalQuantity = existing.quantity + quantity;
+  if (totalQuantity > 10) {
+    return res.status(400).json({ error: 'Máximo de 10 unidades por produto' });
+  }
+  if (p.stock < quantity) {
+    return res.status(409).json({ error: 'Estoque insuficiente para ' + p.name });
+  }
   if (!existing && o.items.length >= 15) {
     return res.status(400).json({ error: 'Limite de itens atingido' });
   }
 
   // diminui o estoque
-  p.stock = p.stock - qty;
+  p.stock = p.stock - quantity;
 
   if (existing) {
-    existing.qty = total;
+    existing.quantity = totalQuantity;
   } else {
-    o.items.push({ productId: p.id, name: p.name, price: p.price, qty: qty });
+    o.items.push({ productId: p.id, name: p.name, price: p.price, quantity });
   }
 
   doCalc(o);

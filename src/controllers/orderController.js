@@ -128,7 +128,7 @@ exports.cancel = (req, res) => {
   // devolve os itens para o estoque
   for (const item of order.items) {
     const p = db.products.find((x) => x.id === item.productId);
-    p.stock = p.stock + item.qty;
+    p.stock = p.stock + item.quantity;
   }
 
   if (order.status !== 'CREATED') {

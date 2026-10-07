@@ -150,7 +150,7 @@ describe('Itens do pedido', () => {
       .send({ productId: 5, quantity: 1 });
 
     expect(res.status).toBe(201);
-    expect(res.body.items).toEqual([{ productId: 5, name: 'Croissant', price: 8, qty: 3 }]);
+    expect(res.body.items).toEqual([{ productId: 5, name: 'Croissant', price: 8, quantity: 3 }]);
     expect(res.body.total).toBe(24);
   });
 
