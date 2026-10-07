@@ -1,0 +1,20 @@
+const DISCOUNT = Object.freeze({
+  PREMIUM_RATE: 0.1,
+  REGULAR_RATE: 0.05,
+  REGULAR_MIN_SUBTOTAL: 100,
+  MAX_RATE: 0.3,
+});
+
+const COUPON = Object.freeze({
+  CAFE10_DISCOUNT_RATE: 0.1,
+  BEMVINDO_FIXED_DISCOUNT: 5,
+});
+
+const DELIVERY = Object.freeze({
+  BASE_FEE: 7,
+  FREE_DELIVERY_MIN_SUBTOTAL: 50,
+  INCLUDED_DISTANCE_KM: 3,
+  FEE_PER_EXTRA_KM: 1.5,
+});
+
+module.exports = { DISCOUNT, COUPON, DELIVERY };
