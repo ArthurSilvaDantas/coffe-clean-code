@@ -8,7 +8,7 @@ function round(n) {
 function calc(list) {
   let t = 0;
   for (let i = 0; i < list.length; i++) {
-    t = t + list[i].value * list[i].qty;
+    t = t + list[i].price * list[i].qty;
   }
   return round(t);
 }

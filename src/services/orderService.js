@@ -43,7 +43,7 @@ function doCalc(o) {
   o.subtotal = helpers.round(subtotal);
   o.discount = helpers.round(discount);
   o.deliveryFee = helpers.round(fee);
-  o.amount = helpers.round(subtotal - discount + fee);
+  o.total = helpers.round(subtotal - discount + fee);
   return o;
 }
 
@@ -103,7 +103,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
       if (existing) {
         existing.qty = existing.qty + it.quantity;
       } else {
-        order.items.push({ productId: p.id, name: p.name, value: p.price, qty: it.quantity });
+        order.items.push({ productId: p.id, name: p.name, price: p.price, qty: it.quantity });
       }
     }
   }
@@ -149,7 +149,7 @@ function handle(req, res) {
   if (existing) {
     existing.qty = total;
   } else {
-    o.items.push({ productId: p.id, name: p.name, value: p.price, qty: qty });
+    o.items.push({ productId: p.id, name: p.name, price: p.price, qty: qty });
   }
 
   doCalc(o);
