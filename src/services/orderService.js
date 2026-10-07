@@ -61,6 +61,65 @@ function calculateTotals(order) {
   return order;
 }
 
+function validateDelivery(deliveryType, address, distance) {
+  if (deliveryType !== DELIVERY_TYPE.PICKUP && deliveryType !== DELIVERY_TYPE.DELIVERY) {
+    return { error: 'Tipo de entrega inválido', status: 400 };
+  }
+  if (deliveryType === DELIVERY_TYPE.PICKUP) {
+    return null;
+  }
+  if (!address) {
+    return { error: 'Endereço é obrigatório para entrega', status: 400 };
+  }
+  if (distance === undefined || distance <= 0) {
+    return { error: 'Distância inválida', status: 400 };
+  }
+  if (distance > DELIVERY.MAX_DISTANCE_KM) {
+    return { error: 'Endereço fora da área de entrega', status: 400 };
+  }
+  return null;
+}
+
+function isValidItemQuantity(quantity) {
+  return quantity > 0 && quantity <= ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT;
+}
+
+function validateRequestedItems(requestedItems) {
+  for (const requestedItem of requestedItems) {
+    const product = productRepository.findById(requestedItem.productId);
+    if (!product || !product.active) {
+      return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
+    }
+    if (!isValidItemQuantity(requestedItem.quantity)) {
+      return { error: 'Quantidade inválida para o produto ' + product.name, status: 400 };
+    }
+    if (product.stock < requestedItem.quantity) {
+      return { error: 'Estoque insuficiente para ' + product.name, status: 409 };
+    }
+  }
+  return null;
+}
+
+function addRequestedItems(order, requestedItems) {
+  for (const requestedItem of requestedItems) {
+    const product = productRepository.decreaseStock(
+      requestedItem.productId,
+      requestedItem.quantity,
+    );
+    const existingItem = order.items.find((item) => item.productId === product.id);
+    if (existingItem) {
+      existingItem.quantity = existingItem.quantity + requestedItem.quantity;
+    } else {
+      order.items.push({
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: requestedItem.quantity,
+      });
+    }
+  }
+}
+
 function createOrder(customerId, deliveryType, distance, address, notes, items) {
   const customer = db.customers.find((c) => c.id === Number(customerId));
   if (!customer) {
@@ -73,21 +132,15 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   }
 
   const selectedDeliveryType = deliveryType || DELIVERY_TYPE.PICKUP;
-  if (
-    selectedDeliveryType !== DELIVERY_TYPE.PICKUP &&
-    selectedDeliveryType !== DELIVERY_TYPE.DELIVERY
-  ) {
-    return { error: 'Tipo de entrega inválido', status: 400 };
+  const deliveryError = validateDelivery(selectedDeliveryType, address, distance);
+  if (deliveryError) {
+    return deliveryError;
   }
-  if (selectedDeliveryType === DELIVERY_TYPE.DELIVERY) {
-    if (!address) {
-      return { error: 'Endereço é obrigatório para entrega', status: 400 };
-    }
-    if (distance === undefined || distance <= 0) {
-      return { error: 'Distância inválida', status: 400 };
-    } else if (distance > DELIVERY.MAX_DISTANCE_KM) {
-      return { error: 'Endereço fora da área de entrega', status: 400 };
-    }
+
+  const requestedItems = items && items.length ? items : [];
+  const itemsError = validateRequestedItems(requestedItems);
+  if (itemsError) {
+    return itemsError;
   }
 
   const order = {
@@ -103,42 +156,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     history: [{ status: ORDER_STATUS.CREATED, at: helpers.now() }],
   };
 
-  if (items && items.length) {
-    for (const requestedItem of items) {
-      const product = productRepository.findById(requestedItem.productId);
-      if (!product || !product.active) {
-        return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
-      }
-      if (
-        !requestedItem.quantity ||
-        requestedItem.quantity <= 0 ||
-        requestedItem.quantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT
-      ) {
-        return { error: 'Quantidade inválida para o produto ' + product.name, status: 400 };
-      }
-      if (product.stock < requestedItem.quantity) {
-        return { error: 'Estoque insuficiente para ' + product.name, status: 409 };
-      }
-    }
-    for (const requestedItem of items) {
-      const product = productRepository.decreaseStock(
-        requestedItem.productId,
-        requestedItem.quantity,
-      );
-      const existingItem = order.items.find((item) => item.productId === product.id);
-      if (existingItem) {
-        existingItem.quantity = existingItem.quantity + requestedItem.quantity;
-      } else {
-        order.items.push({
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: requestedItem.quantity,
-        });
-      }
-    }
-  }
-
+  addRequestedItems(order, requestedItems);
   calculateTotals(order);
   orderRepository.save(order);
   return { order };
