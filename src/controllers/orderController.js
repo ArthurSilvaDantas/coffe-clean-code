@@ -58,8 +58,8 @@ exports.applyCoupon = (req, res) => {
   try {
     const order = orderService.applyCoupon(req.params.id, (req.body || {}).code);
     res.json(order);
-  } catch (e) {
-    res.status(e.status || 500).json({ message: e.message });
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message });
   }
 };
 
@@ -68,22 +68,22 @@ exports.updateStatus = (req, res) => {
   if (order) {
     const newStatus = (req.body || {}).status;
     if (newStatus) {
-      let ok = false;
+      let isValidTransition = false;
       if (order.status === 'PAID') {
-        if (newStatus === 'PREPARING') ok = true;
+        if (newStatus === 'PREPARING') isValidTransition = true;
       } else if (order.status === 'PREPARING') {
-        if (newStatus === 'READY') ok = true;
+        if (newStatus === 'READY') isValidTransition = true;
       } else if (order.status === 'READY') {
         if (order.deliveryType === 'delivery') {
-          if (newStatus === 'OUT_FOR_DELIVERY') ok = true;
+          if (newStatus === 'OUT_FOR_DELIVERY') isValidTransition = true;
         } else {
-          if (newStatus === 'DELIVERED') ok = true;
+          if (newStatus === 'DELIVERED') isValidTransition = true;
         }
       } else if (order.status === 'OUT_FOR_DELIVERY') {
-        if (newStatus === 'DELIVERED') ok = true;
+        if (newStatus === 'DELIVERED') isValidTransition = true;
       }
 
-      if (ok) {
+      if (isValidTransition) {
         order.status = newStatus;
         order.history.push({ status: newStatus, at: new Date().toISOString() });
         if (newStatus === 'DELIVERED') {
@@ -127,16 +127,16 @@ exports.cancel = (req, res) => {
 
   // devolve os itens para o estoque
   for (const item of order.items) {
-    const p = db.products.find((x) => x.id === item.productId);
-    p.stock = p.stock + item.quantity;
+    const product = db.products.find((p) => p.id === item.productId);
+    product.stock = product.stock + item.quantity;
   }
 
   if (order.status !== 'CREATED') {
     const customer = db.customers.find((c) => c.id === order.customerId);
     customer.points = customer.points - order.payment.points;
     if (customer.points < 0) customer.points = 0;
-    const pay = db.payments.find((x) => x.orderId === order.id);
-    pay.refunded = Math.round(refund * 100) / 100;
+    const payment = db.payments.find((storedPayment) => storedPayment.orderId === order.id);
+    payment.refunded = Math.round(refund * 100) / 100;
   }
 
   order.status = 'CANCELLED';

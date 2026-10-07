@@ -1,26 +1,26 @@
 // Funções auxiliares
 
-function roundToCents(n) {
-  return Math.round(n * 100) / 100;
+function roundToCents(value) {
+  return Math.round(value * 100) / 100;
 }
 
 // calcula
-function calculateSubtotal(list) {
-  let t = 0;
-  for (let i = 0; i < list.length; i++) {
-    t = t + list[i].price * list[i].quantity;
+function calculateSubtotal(items) {
+  let subtotal = 0;
+  for (let i = 0; i < items.length; i++) {
+    subtotal = subtotal + items[i].price * items[i].quantity;
   }
-  return roundToCents(t);
+  return roundToCents(subtotal);
 }
 
-function isValidCard(n) {
-  if (typeof n !== 'string') return false;
-  const digits = n.replace(/\s/g, '');
+function isValidCard(cardNumber) {
+  if (typeof cardNumber !== 'string') return false;
+  const digits = cardNumber.replace(/\s/g, '');
   return digits.length === 16 && /^\d+$/.test(digits);
 }
 
-function maskCard(n) {
-  return '**** **** **** ' + n.replace(/\s/g, '').slice(-4);
+function maskCard(cardNumber) {
+  return '**** **** **** ' + cardNumber.replace(/\s/g, '').slice(-4);
 }
 
 function isPremium(customer) {
@@ -31,8 +31,8 @@ function now() {
   return new Date().toISOString();
 }
 
-function fail(res, code, msg) {
-  return res.status(code).json({ error: msg });
+function fail(res, status, message) {
+  return res.status(status).json({ error: message });
 }
 
 module.exports = { roundToCents, calculateSubtotal, isValidCard, maskCard, isPremium, now, fail };
