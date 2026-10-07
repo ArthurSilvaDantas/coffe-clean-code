@@ -3,13 +3,13 @@ const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
 
 function doIt(id, data) {
-  const purchase = orderRepository.getPurchase(id);
-  if (!purchase) return { ok: false, code: 404, msg: 'Pedido não encontrado' };
+  const order = orderRepository.getOrder(id);
+  if (!order) return { ok: false, code: 404, msg: 'Pedido não encontrado' };
 
-  if (purchase.status === 'CREATED') {
-    if (purchase.items.length > 0) {
-      const customer = db.customers.find((c) => c.id === purchase.customerId);
-      let value = purchase.amount;
+  if (order.status === 'CREATED') {
+    if (order.items.length > 0) {
+      const customer = db.customers.find((c) => c.id === order.customerId);
+      let value = order.amount;
       const extra = {};
 
       if (data.method === 'pix') {
@@ -43,7 +43,7 @@ function doIt(id, data) {
           return { ok: false, code: 400, msg: 'Valor em dinheiro insuficiente' };
         }
         const change = data.cashGiven - value;
-        if (purchase.deliveryType === 'delivery' && change > 50) {
+        if (order.deliveryType === 'delivery' && change > 50) {
           return { ok: false, code: 400, msg: 'Troco máximo para entrega é de R$ 50,00' };
         }
         extra.cashGiven = data.cashGiven;
@@ -64,7 +64,7 @@ function doIt(id, data) {
 
       const payment = {
         id: db.counters.payment++,
-        purchaseId: purchase.id,
+        orderId: order.id,
         method: data.method,
         total: value,
         points: points,
@@ -73,15 +73,15 @@ function doIt(id, data) {
       };
       db.payments.push(payment);
 
-      purchase.status = 'PAID';
-      purchase.payment = payment;
-      purchase.history.push({ status: 'PAID', at: payment.paidAt });
+      order.status = 'PAID';
+      order.payment = payment;
+      order.history.push({ status: 'PAID', at: payment.paidAt });
 
-      return { ok: true, data: purchase };
+      return { ok: true, data: order };
     } else {
       return { ok: false, code: 400, msg: 'Pedido sem itens' };
     }
-  } else if (purchase.status === 'CANCELLED') {
+  } else if (order.status === 'CANCELLED') {
     return { ok: false, code: 400, msg: 'Pedido cancelado' };
   } else {
     return { ok: false, code: 409, msg: 'Pedido já foi pago' };

@@ -109,12 +109,12 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   }
 
   doCalc(order);
-  orderRepository.savePurchase(order);
+  orderRepository.saveOrder(order);
   return { order };
 }
 
 function handle(req, res) {
-  const o = orderRepository.getPurchase(req.params.id);
+  const o = orderRepository.getOrder(req.params.id);
   if (!o) return res.status(404).json({ error: 'Pedido não encontrado' });
   if (o.status !== 'CREATED') {
     return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
@@ -157,7 +157,7 @@ function handle(req, res) {
 }
 
 function applyCoupon(orderId, code) {
-  const o = orderRepository.getPurchase(orderId);
+  const o = orderRepository.getOrder(orderId);
   if (!o) {
     const err = new Error('Pedido não encontrado');
     err.status = 404;
@@ -176,7 +176,7 @@ function applyCoupon(orderId, code) {
     err.status = 400;
     throw err;
   }
-  if (c === 'BEMVINDO' && orderRepository.hasPaidPurchases(o.customerId)) {
+  if (c === 'BEMVINDO' && orderRepository.hasPaidOrders(o.customerId)) {
     const err = new Error('Cupom válido apenas para a primeira compra');
     err.status = 400;
     throw err;

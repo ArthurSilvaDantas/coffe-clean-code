@@ -45,7 +45,7 @@ exports.listByCustomer = (req, res) => {
 };
 
 exports.get = (req, res) => {
-  const order = orderRepository.getPurchase(req.params.id);
+  const order = orderRepository.getOrder(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   res.json(order);
 };
@@ -64,7 +64,7 @@ exports.applyCoupon = (req, res) => {
 };
 
 exports.updateStatus = (req, res) => {
-  const order = orderRepository.getPurchase(req.params.id);
+  const order = orderRepository.getOrder(req.params.id);
   if (order) {
     const newStatus = (req.body || {}).status;
     if (newStatus) {
@@ -104,7 +104,7 @@ exports.updateStatus = (req, res) => {
 };
 
 exports.cancel = (req, res) => {
-  const order = orderRepository.getPurchase(req.params.id);
+  const order = orderRepository.getOrder(req.params.id);
   if (!order) {
     return res.status(404).json({ error: 'Pedido não encontrado' });
   }
@@ -135,7 +135,7 @@ exports.cancel = (req, res) => {
     const customer = db.customers.find((c) => c.id === order.customerId);
     customer.points = customer.points - order.payment.points;
     if (customer.points < 0) customer.points = 0;
-    const pay = db.payments.find((x) => x.purchaseId === order.id);
+    const pay = db.payments.find((x) => x.orderId === order.id);
     pay.refunded = Math.round(refund * 100) / 100;
   }
 
