@@ -1,9 +1,10 @@
 const customerRepository = require('../repositories/customerRepository');
 const { db } = require('../data/db');
+const { CUSTOMER_RULES } = require('../constants/businessRules');
 
 function create(req, res) {
   const customerData = req.body || {};
-  if (!customerData.name || customerData.name.trim().length < 3) {
+  if (!customerData.name || customerData.name.trim().length < CUSTOMER_RULES.MIN_NAME_LENGTH) {
     return res.status(400).json({ error: 'Nome inválido' });
   }
   if (!customerData.email || customerData.email.indexOf('@') === -1) {

@@ -1,6 +1,8 @@
 const { db } = require('../data/db');
 const orderService = require('../services/orderService');
 const orderRepository = require('../repositories/orderRepository');
+const helpers = require('../utils/helpers');
+const { CANCELLATION } = require('../constants/businessRules');
 
 exports.create = (req, res) => {
   const body = req.body || {};
@@ -116,7 +118,7 @@ exports.cancel = (req, res) => {
   } else if (order.status === 'PAID') {
     refund = order.payment.total;
   } else if (order.status === 'PREPARING') {
-    refund = order.payment.total * 0.5;
+    refund = order.payment.total * CANCELLATION.PREPARING_REFUND_RATE;
   } else {
     return res.status(400).json({ message: 'Pedido não pode mais ser cancelado' });
   }
@@ -136,11 +138,11 @@ exports.cancel = (req, res) => {
     customer.points = customer.points - order.payment.points;
     if (customer.points < 0) customer.points = 0;
     const payment = db.payments.find((storedPayment) => storedPayment.orderId === order.id);
-    payment.refunded = Math.round(refund * 100) / 100;
+    payment.refunded = helpers.roundToCents(refund);
   }
 
   order.status = 'CANCELLED';
-  order.refund = Math.round(refund * 100) / 100;
+  order.refund = helpers.roundToCents(refund);
   order.cancelReason = reason || null;
   order.history.push({ status: 'CANCELLED', at: new Date().toISOString() });
 

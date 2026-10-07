@@ -46,4 +46,28 @@ const LOYALTY = Object.freeze({
   PREMIUM_UPGRADE_POINTS: 200,
 });
 
-module.exports = { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS, PAYMENT, CARD, LOYALTY };
+const CANCELLATION = Object.freeze({
+  PREPARING_REFUND_RATE: 0.5,
+});
+
+const PRODUCT_RULES = Object.freeze({
+  MAX_PRICE: 500,
+  MAX_STOCK: 200,
+});
+
+const CUSTOMER_RULES = Object.freeze({
+  MIN_NAME_LENGTH: 3,
+});
+
+module.exports = {
+  DISCOUNT,
+  COUPON,
+  DELIVERY,
+  ORDER_LIMITS,
+  PAYMENT,
+  CARD,
+  LOYALTY,
+  CANCELLATION,
+  PRODUCT_RULES,
+  CUSTOMER_RULES,
+};

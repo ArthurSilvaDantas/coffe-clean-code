@@ -1,5 +1,6 @@
 const { db } = require('../data/db');
 const productRepository = require('../repositories/productRepository');
+const { PRODUCT_RULES } = require('../constants/businessRules');
 
 exports.create = (req, res) => {
   const { name, price, stock, category } = req.body || {};
@@ -7,11 +8,17 @@ exports.create = (req, res) => {
   if (price === undefined || typeof price !== 'number' || price <= 0) {
     return res.status(400).json({ error: 'Preço inválido' });
   }
-  if (price > 500) return res.status(400).json({ error: 'Preço acima do permitido' });
+  if (price > PRODUCT_RULES.MAX_PRICE) {
+    return res.status(400).json({ error: 'Preço acima do permitido' });
+  }
 
   let initialStock = stock;
   if (initialStock === undefined) initialStock = 0;
-  if (typeof initialStock !== 'number' || initialStock < 0 || initialStock > 200) {
+  if (
+    typeof initialStock !== 'number' ||
+    initialStock < 0 ||
+    initialStock > PRODUCT_RULES.MAX_STOCK
+  ) {
     return res.status(400).json({ message: 'Estoque inválido' });
   }
 
@@ -56,7 +63,7 @@ exports.updateStock = (req, res) => {
   if (product.stock + stockChange < 0) {
     return res.status(400).json({ error: 'Estoque não pode ficar negativo' });
   }
-  if (product.stock + stockChange > 200) {
+  if (product.stock + stockChange > PRODUCT_RULES.MAX_STOCK) {
     return res.status(400).json({ error: 'Estoque máximo excedido' });
   }
 
