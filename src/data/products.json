@@ -1,0 +1,9 @@
+[
+  { "id": 1, "name": "Espresso", "price": 6.5, "stock": 50, "category": "coffee", "active": true },
+  { "id": 2, "name": "Cappuccino", "price": 9.9, "stock": 30, "category": "coffee", "active": true },
+  { "id": 3, "name": "Latte", "price": 10.5, "stock": 30, "category": "coffee", "active": true },
+  { "id": 4, "name": "Pão de queijo", "price": 5, "stock": 40, "category": "food", "active": true },
+  { "id": 5, "name": "Croissant", "price": 8, "stock": 20, "category": "food", "active": true },
+  { "id": 6, "name": "Bolo de cenoura", "price": 7.5, "stock": 10, "category": "food", "active": true },
+  { "id": 7, "name": "Cold brew", "price": 12, "stock": 5, "category": "coffee", "active": true }
+]
