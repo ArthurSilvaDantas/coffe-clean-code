@@ -53,6 +53,8 @@ Termos usados de forma única no código, na API e nos testes.
 | `status`       | Situação do pedido no seu ciclo de vida.                                                    |
 | `refund`       | Valor devolvido ao cliente no cancelamento.                                                 |
 
+Os valores fixos do domínio (status, tipos, cupons, formas de pagamento e categorias) ficam em `src/constants/domain.js`, e as regras de negócio (descontos, taxas, limites e pontos) ficam em `src/constants/businessRules.js`.
+
 ## Endpoints
 
 | Método | Rota                    | Descrição                                          |
