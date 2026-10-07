@@ -2,7 +2,7 @@ const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const productRepository = require('../repositories/productRepository');
 const orderRepository = require('../repositories/orderRepository');
-const { DISCOUNT, COUPON, DELIVERY } = require('../constants/businessRules');
+const { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS } = require('../constants/businessRules');
 
 function calculateTotals(order) {
   const subtotal = helpers.calculateSubtotal(order.items);
@@ -59,7 +59,9 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   if (!customer) {
     return { error: 'Cliente não encontrado', status: 404 };
   }
-  if (orderRepository.countOpenByCustomer(customer.id) >= 3) {
+  if (
+    orderRepository.countOpenByCustomer(customer.id) >= ORDER_LIMITS.MAX_OPEN_ORDERS_PER_CUSTOMER
+  ) {
     return { error: 'Cliente possui muitos pedidos em aberto', status: 409 };
   }
 
@@ -73,7 +75,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     }
     if (distance === undefined || distance <= 0) {
       return { error: 'Distância inválida', status: 400 };
-    } else if (distance > 10) {
+    } else if (distance > DELIVERY.MAX_DISTANCE_KM) {
       return { error: 'Endereço fora da área de entrega', status: 400 };
     }
   }
@@ -97,7 +99,11 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
       if (!product || !product.active) {
         return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
       }
-      if (!requestedItem.quantity || requestedItem.quantity <= 0 || requestedItem.quantity > 10) {
+      if (
+        !requestedItem.quantity ||
+        requestedItem.quantity <= 0 ||
+        requestedItem.quantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT
+      ) {
         return { error: 'Quantidade inválida para o produto ' + product.name, status: 400 };
       }
       if (product.stock < requestedItem.quantity) {
@@ -152,13 +158,15 @@ function addItem(req, res) {
 
   let totalQuantity = quantity;
   if (existingItem) totalQuantity = existingItem.quantity + quantity;
-  if (totalQuantity > 10) {
-    return res.status(400).json({ error: 'Máximo de 10 unidades por produto' });
+  if (totalQuantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT) {
+    return res
+      .status(400)
+      .json({ error: `Máximo de ${ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT} unidades por produto` });
   }
   if (product.stock < quantity) {
     return res.status(409).json({ error: 'Estoque insuficiente para ' + product.name });
   }
-  if (!existingItem && order.items.length >= 15) {
+  if (!existingItem && order.items.length >= ORDER_LIMITS.MAX_DISTINCT_ITEMS) {
     return res.status(400).json({ error: 'Limite de itens atingido' });
   }
 
