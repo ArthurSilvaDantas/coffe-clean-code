@@ -1,5 +1,4 @@
 const customerRepository = require('../repositories/customerRepository');
-const { db } = require('../data/db');
 const { CUSTOMER_RULES } = require('../constants/businessRules');
 const { CUSTOMER_TYPE } = require('../constants/domain');
 const { badRequest, conflict, notFound } = require('../errors/AppError');
@@ -13,9 +12,7 @@ function create(req, res) {
     throw badRequest('Email inválido');
   }
 
-  const existingCustomer = db.customers.find(
-    (c) => c.email.toLowerCase() === customerData.email.toLowerCase(),
-  );
+  const existingCustomer = customerRepository.findByEmail(customerData.email);
   if (existingCustomer) {
     throw conflict('Email já cadastrado');
   }

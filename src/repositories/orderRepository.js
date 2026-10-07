@@ -11,6 +11,14 @@ function findById(id) {
   return db.orders.find((o) => o.id === Number(id));
 }
 
+function findAll() {
+  return db.orders;
+}
+
+function findByCustomerId(customerId) {
+  return db.orders.filter((o) => o.customerId === customerId);
+}
+
 function countOpenByCustomer(customerId) {
   return db.orders.filter((o) => o.customerId === customerId && o.status === ORDER_STATUS.CREATED)
     .length;
@@ -25,4 +33,11 @@ function hasPaidOrders(customerId) {
   );
 }
 
-module.exports = { save, findById, countOpenByCustomer, hasPaidOrders };
+module.exports = {
+  save,
+  findById,
+  findAll,
+  findByCustomerId,
+  countOpenByCustomer,
+  hasPaidOrders,
+};

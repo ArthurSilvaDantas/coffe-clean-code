@@ -1,6 +1,7 @@
-const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
+const customerRepository = require('../repositories/customerRepository');
+const paymentRepository = require('../repositories/paymentRepository');
 const { PAYMENT, LOYALTY } = require('../constants/businessRules');
 const { badRequest, conflict, notFound } = require('../errors/AppError');
 const {
@@ -127,19 +128,17 @@ function payOrder(orderId, paymentData) {
   const methodResult = payWithMethod({ total: order.total, paymentData, order });
 
   const total = helpers.roundToCents(methodResult.total);
-  const customer = db.customers.find((c) => c.id === order.customerId);
+  const customer = customerRepository.findById(order.customerId);
   const points = awardLoyaltyPoints(customer, total);
 
-  const payment = {
-    id: db.counters.payment++,
+  const payment = paymentRepository.save({
     orderId: order.id,
     method: paymentData.method,
     total,
     points,
     ...methodResult.details,
     paidAt: helpers.now(),
-  };
-  db.payments.push(payment);
+  });
 
   order.status = ORDER_STATUS.PAID;
   order.payment = payment;

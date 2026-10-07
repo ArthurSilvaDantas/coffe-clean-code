@@ -1,6 +1,8 @@
-const { db } = require('../data/db');
 const orderService = require('../services/orderService');
 const orderRepository = require('../repositories/orderRepository');
+const customerRepository = require('../repositories/customerRepository');
+const productRepository = require('../repositories/productRepository');
+const paymentRepository = require('../repositories/paymentRepository');
 const helpers = require('../utils/helpers');
 const { CANCELLATION } = require('../constants/businessRules');
 const { ORDER_STATUS, DELIVERY_TYPE } = require('../constants/domain');
@@ -23,7 +25,7 @@ exports.create = (req, res) => {
 };
 
 exports.list = (req, res) => {
-  let orders = db.orders;
+  let orders = orderRepository.findAll();
   if (req.query.status) {
     orders = orders.filter((o) => o.status === req.query.status.toUpperCase());
   }
@@ -34,11 +36,11 @@ exports.list = (req, res) => {
 };
 
 exports.listByCustomer = (req, res) => {
-  const customer = db.customers.find((c) => c.id === Number(req.params.id));
+  const customer = customerRepository.findById(req.params.id);
   if (!customer) {
     throw notFound('Cliente não encontrado');
   }
-  let orders = db.orders.filter((o) => o.customerId === customer.id);
+  let orders = orderRepository.findByCustomerId(customer.id);
   if (req.query.status) {
     orders = orders.filter((o) => o.status === req.query.status.toUpperCase());
   }
@@ -115,13 +117,12 @@ function calculateRefund(order) {
 
 function restoreStock(order) {
   for (const item of order.items) {
-    const product = db.products.find((p) => p.id === item.productId);
-    product.stock = product.stock + item.quantity;
+    productRepository.increaseStock(item.productId, item.quantity);
   }
 }
 
 function reverseLoyaltyPoints(order) {
-  const customer = db.customers.find((c) => c.id === order.customerId);
+  const customer = customerRepository.findById(order.customerId);
   customer.points = Math.max(customer.points - order.payment.points, 0);
 }
 
@@ -144,7 +145,7 @@ exports.cancel = (req, res) => {
   restoreStock(order);
   if (wasPaid) {
     reverseLoyaltyPoints(order);
-    const payment = db.payments.find((storedPayment) => storedPayment.orderId === order.id);
+    const payment = paymentRepository.findByOrderId(order.id);
     payment.refunded = refund;
   }
 

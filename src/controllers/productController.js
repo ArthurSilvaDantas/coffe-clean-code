@@ -1,4 +1,3 @@
-const { db } = require('../data/db');
 const productRepository = require('../repositories/productRepository');
 const { PRODUCT_RULES } = require('../constants/businessRules');
 const { PRODUCT_CATEGORY } = require('../constants/domain');
@@ -43,7 +42,7 @@ exports.create = (req, res) => {
 };
 
 exports.list = (req, res) => {
-  let products = db.products.filter((p) => p.active);
+  let products = productRepository.findAll().filter((p) => p.active);
   if (req.query.category) {
     products = products.filter((p) => p.category === req.query.category);
   }
@@ -54,7 +53,7 @@ exports.list = (req, res) => {
 };
 
 exports.updateStock = (req, res) => {
-  const product = db.products.find((p) => p.id === Number(req.params.id));
+  const product = productRepository.findById(req.params.id);
   if (!product) throw notFound('Produto não encontrado');
 
   const stockChange = (req.body || {}).quantity;

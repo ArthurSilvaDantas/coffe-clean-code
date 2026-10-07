@@ -1,7 +1,7 @@
-const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const productRepository = require('../repositories/productRepository');
 const orderRepository = require('../repositories/orderRepository');
+const customerRepository = require('../repositories/customerRepository');
 const { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS } = require('../constants/businessRules');
 const { ORDER_STATUS, CUSTOMER_TYPE, DELIVERY_TYPE, COUPON_CODE } = require('../constants/domain');
 const { badRequest, conflict, notFound } = require('../errors/AppError');
@@ -51,7 +51,7 @@ function calculateDeliveryFee(order, customer, subtotal) {
 
 function calculateTotals(order) {
   const subtotal = helpers.calculateSubtotal(order.items);
-  const customer = db.customers.find((c) => c.id === order.customerId);
+  const customer = customerRepository.findById(order.customerId);
   const discount = calculateDiscount(order, customer, subtotal);
   const deliveryFee = calculateDeliveryFee(order, customer, subtotal);
 
@@ -120,7 +120,7 @@ function addRequestedItems(order, requestedItems) {
 }
 
 function createOrder(customerId, deliveryType, distance, address, notes, items) {
-  const customer = db.customers.find((c) => c.id === Number(customerId));
+  const customer = customerRepository.findById(customerId);
   if (!customer) {
     throw notFound('Cliente não encontrado');
   }
@@ -166,7 +166,7 @@ function addItem(req, res) {
   if (!productId) throw badRequest('productId é obrigatório');
   if (!quantity || quantity <= 0) throw badRequest('Quantidade inválida');
 
-  const product = db.products.find((p) => p.id === Number(productId));
+  const product = productRepository.findById(productId);
   if (!product || !product.active) throw notFound('Produto não encontrado');
 
   const existingItem = order.items.find((item) => item.productId === product.id);
