@@ -105,44 +105,59 @@ exports.updateStatus = (req, res) => {
   res.json(order);
 };
 
+const CANCELLABLE_STATUSES = Object.freeze([
+  ORDER_STATUS.CREATED,
+  ORDER_STATUS.PAID,
+  ORDER_STATUS.PREPARING,
+]);
+
+function calculateRefund(order) {
+  if (order.status === ORDER_STATUS.PAID) {
+    return order.payment.total;
+  }
+  if (order.status === ORDER_STATUS.PREPARING) {
+    return order.payment.total * CANCELLATION.PREPARING_REFUND_RATE;
+  }
+  return 0;
+}
+
+function restoreStock(order) {
+  for (const item of order.items) {
+    const product = db.products.find((p) => p.id === item.productId);
+    product.stock = product.stock + item.quantity;
+  }
+}
+
+function reverseLoyaltyPoints(order) {
+  const customer = db.customers.find((c) => c.id === order.customerId);
+  customer.points = Math.max(customer.points - order.payment.points, 0);
+}
+
 exports.cancel = (req, res) => {
   const order = orderRepository.findById(req.params.id);
   if (!order) {
     return res.status(404).json({ error: 'Pedido não encontrado' });
   }
-  const reason = (req.body || {}).reason;
-
-  let refund;
-  if (order.status === ORDER_STATUS.CREATED) {
-    refund = 0;
-  } else if (order.status === ORDER_STATUS.PAID) {
-    refund = order.payment.total;
-  } else if (order.status === ORDER_STATUS.PREPARING) {
-    refund = order.payment.total * CANCELLATION.PREPARING_REFUND_RATE;
-  } else {
+  if (!CANCELLABLE_STATUSES.includes(order.status)) {
     return res.status(400).json({ message: 'Pedido não pode mais ser cancelado' });
   }
 
-  if (!reason && order.status !== ORDER_STATUS.CREATED) {
+  const reason = (req.body || {}).reason;
+  const wasPaid = order.status !== ORDER_STATUS.CREATED;
+  if (wasPaid && !reason) {
     return res.status(400).json({ message: 'Informe o motivo do cancelamento' });
   }
 
-  // devolve os itens para o estoque
-  for (const item of order.items) {
-    const product = db.products.find((p) => p.id === item.productId);
-    product.stock = product.stock + item.quantity;
-  }
-
-  if (order.status !== ORDER_STATUS.CREATED) {
-    const customer = db.customers.find((c) => c.id === order.customerId);
-    customer.points = customer.points - order.payment.points;
-    if (customer.points < 0) customer.points = 0;
+  const refund = helpers.roundToCents(calculateRefund(order));
+  restoreStock(order);
+  if (wasPaid) {
+    reverseLoyaltyPoints(order);
     const payment = db.payments.find((storedPayment) => storedPayment.orderId === order.id);
-    payment.refunded = helpers.roundToCents(refund);
+    payment.refunded = refund;
   }
 
   order.status = ORDER_STATUS.CANCELLED;
-  order.refund = helpers.roundToCents(refund);
+  order.refund = refund;
   order.cancelReason = reason || null;
   order.history.push({ status: ORDER_STATUS.CANCELLED, at: new Date().toISOString() });
 
