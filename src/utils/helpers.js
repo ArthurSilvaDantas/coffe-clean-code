@@ -23,8 +23,8 @@ function maskCard(n) {
   return '**** **** **** ' + n.replace(/\s/g, '').slice(-4);
 }
 
-function isPremium(client) {
-  return client.type === 'premium';
+function isPremium(customer) {
+  return customer.type === 'premium';
 }
 
 function now() {

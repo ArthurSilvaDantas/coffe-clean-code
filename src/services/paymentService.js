@@ -8,7 +8,7 @@ function doIt(id, data) {
 
   if (purchase.status === 'CREATED') {
     if (purchase.items.length > 0) {
-      const user = db.customers.find((c) => c.id === purchase.clientId);
+      const customer = db.customers.find((c) => c.id === purchase.customerId);
       let value = purchase.amount;
       const extra = {};
 
@@ -56,10 +56,10 @@ function doIt(id, data) {
 
       // pontos de fidelidade
       let points = Math.floor(value);
-      if (user.type === 'premium') points = points * 2;
-      user.points = user.points + points;
-      if (user.type === 'regular' && user.points >= 200) {
-        user.type = 'premium';
+      if (customer.type === 'premium') points = points * 2;
+      customer.points = customer.points + points;
+      if (customer.type === 'regular' && customer.points >= 200) {
+        customer.type = 'premium';
       }
 
       const payment = {

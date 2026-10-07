@@ -5,10 +5,10 @@ const orderRepository = require('../repositories/orderRepository');
 
 function doCalc(o) {
   const subtotal = helpers.calc(o.items);
-  const client = db.customers.find((c) => c.id === o.clientId);
+  const customer = db.customers.find((c) => c.id === o.customerId);
   let discount = 0;
 
-  if (client.type === 'premium') {
+  if (customer.type === 'premium') {
     discount = subtotal * 0.1;
   } else {
     if (subtotal >= 100) {
@@ -30,7 +30,7 @@ function doCalc(o) {
 
   let fee = 0;
   if (o.deliveryType === 'delivery') {
-    if (client.type === 'premium' || subtotal >= 50 || o.coupon === 'FRETEGRATIS') {
+    if (customer.type === 'premium' || subtotal >= 50 || o.coupon === 'FRETEGRATIS') {
       fee = 0;
     } else {
       fee = 7;
@@ -52,7 +52,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   if (!customer) {
     return { error: 'Cliente não encontrado', status: 404 };
   }
-  if (orderRepository.countOpenByClient(customer.id) >= 3) {
+  if (orderRepository.countOpenByCustomer(customer.id) >= 3) {
     return { error: 'Cliente possui muitos pedidos em aberto', status: 409 };
   }
 
@@ -72,7 +72,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   }
 
   const order = {
-    clientId: customer.id,
+    customerId: customer.id,
     items: [],
     deliveryType: type,
     distance: type === 'delivery' ? distance : 0,
@@ -176,7 +176,7 @@ function applyCoupon(orderId, code) {
     err.status = 400;
     throw err;
   }
-  if (c === 'BEMVINDO' && orderRepository.hasPaidPurchases(o.clientId)) {
+  if (c === 'BEMVINDO' && orderRepository.hasPaidPurchases(o.customerId)) {
     const err = new Error('Cupom válido apenas para a primeira compra');
     err.status = 400;
     throw err;

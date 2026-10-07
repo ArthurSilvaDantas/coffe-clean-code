@@ -27,17 +27,17 @@ exports.list = (req, res) => {
     orders = orders.filter((o) => o.status === req.query.status.toUpperCase());
   }
   if (req.query.customerId) {
-    orders = orders.filter((o) => o.clientId === Number(req.query.customerId));
+    orders = orders.filter((o) => o.customerId === Number(req.query.customerId));
   }
   res.json(orders);
 };
 
-exports.listByClient = (req, res) => {
-  const client = db.customers.find((c) => c.id === Number(req.params.id));
-  if (!client) {
+exports.listByCustomer = (req, res) => {
+  const customer = db.customers.find((c) => c.id === Number(req.params.id));
+  if (!customer) {
     return res.status(404).json({ error: 'Cliente não encontrado' });
   }
-  let orders = db.orders.filter((o) => o.clientId === client.id);
+  let orders = db.orders.filter((o) => o.customerId === customer.id);
   if (req.query.status) {
     orders = orders.filter((o) => o.status === req.query.status.toUpperCase());
   }
@@ -132,9 +132,9 @@ exports.cancel = (req, res) => {
   }
 
   if (order.status !== 'CREATED') {
-    const client = db.customers.find((c) => c.id === order.clientId);
-    client.points = client.points - order.payment.points;
-    if (client.points < 0) client.points = 0;
+    const customer = db.customers.find((c) => c.id === order.customerId);
+    customer.points = customer.points - order.payment.points;
+    if (customer.points < 0) customer.points = 0;
     const pay = db.payments.find((x) => x.purchaseId === order.id);
     pay.refunded = Math.round(refund * 100) / 100;
   }
