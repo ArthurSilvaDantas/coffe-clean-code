@@ -31,6 +31,28 @@ npm run format        # Prettier (formata os arquivos)
 npm run format:check  # Prettier (apenas verifica)
 ```
 
+## Glossário do domínio
+
+Termos usados de forma única no código, na API e nos testes.
+
+| Termo          | Significado                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------- |
+| `customer`     | Cliente da cafeteria. Pode ser `regular` ou `premium` e acumula `points` de fidelidade.     |
+| `product`      | Item do cardápio, com `price`, `stock` e `category` (`coffee`, `food` ou `drink`).          |
+| `order`        | Pedido feito por um cliente, identificado pelo `customerId`.                                |
+| `item`         | Produto dentro de um pedido, com `productId`, `name`, `price` e `quantity`.                 |
+| `price`        | Preço unitário de um produto.                                                               |
+| `quantity`     | Quantidade de unidades de um produto.                                                       |
+| `subtotal`     | Soma de `price × quantity` dos itens do pedido.                                             |
+| `discount`     | Desconto aplicado ao pedido (tipo de cliente e cupom).                                      |
+| `deliveryFee`  | Taxa de entrega.                                                                            |
+| `total`        | Valor final: no pedido, `subtotal - discount + deliveryFee`; no pagamento, o valor cobrado. |
+| `coupon`       | Cupom de desconto aplicado ao pedido.                                                       |
+| `deliveryType` | Forma de recebimento: `pickup` (retirada) ou `delivery` (entrega).                          |
+| `payment`      | Pagamento de um pedido, identificado pelo `orderId`.                                        |
+| `status`       | Situação do pedido no seu ciclo de vida.                                                    |
+| `refund`       | Valor devolvido ao cliente no cancelamento.                                                 |
+
 ## Endpoints
 
 | Método | Rota                    | Descrição                                          |
