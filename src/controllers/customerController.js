@@ -1,6 +1,7 @@
 const customerRepository = require('../repositories/customerRepository');
 const { db } = require('../data/db');
 const { CUSTOMER_RULES } = require('../constants/businessRules');
+const { CUSTOMER_TYPE } = require('../constants/domain');
 
 function create(req, res) {
   const customerData = req.body || {};
@@ -18,9 +19,12 @@ function create(req, res) {
     return res.status(409).json({ error: 'Email já cadastrado' });
   }
 
-  let customerType = 'regular';
+  let customerType = CUSTOMER_TYPE.REGULAR;
   if (customerData.type) {
-    if (customerData.type === 'premium' || customerData.type === 'regular') {
+    if (
+      customerData.type === CUSTOMER_TYPE.PREMIUM ||
+      customerData.type === CUSTOMER_TYPE.REGULAR
+    ) {
       customerType = customerData.type;
     } else {
       return res.status(400).json({ msg: 'Tipo de cliente inválido' });

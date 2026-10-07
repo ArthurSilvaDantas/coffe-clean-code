@@ -1,4 +1,5 @@
 const { db } = require('../data/db');
+const { ORDER_STATUS } = require('../constants/domain');
 
 function save(order) {
   order.id = db.counters.order++;
@@ -11,12 +12,16 @@ function findById(id) {
 }
 
 function countOpenByCustomer(customerId) {
-  return db.orders.filter((o) => o.customerId === customerId && o.status === 'CREATED').length;
+  return db.orders.filter((o) => o.customerId === customerId && o.status === ORDER_STATUS.CREATED)
+    .length;
 }
 
 function hasPaidOrders(customerId) {
   return db.orders.some(
-    (o) => o.customerId === customerId && o.status !== 'CREATED' && o.status !== 'CANCELLED',
+    (o) =>
+      o.customerId === customerId &&
+      o.status !== ORDER_STATUS.CREATED &&
+      o.status !== ORDER_STATUS.CANCELLED,
   );
 }
 

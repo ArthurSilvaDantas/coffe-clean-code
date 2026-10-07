@@ -1,4 +1,5 @@
 const { CARD } = require('../constants/businessRules');
+const { CUSTOMER_TYPE } = require('../constants/domain');
 
 function roundToCents(value) {
   return Math.round(value * 100) / 100;
@@ -27,7 +28,7 @@ function formatCurrency(value) {
 }
 
 function isPremium(customer) {
-  return customer.type === 'premium';
+  return customer.type === CUSTOMER_TYPE.PREMIUM;
 }
 
 function now() {

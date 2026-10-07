@@ -3,13 +3,14 @@ const helpers = require('../utils/helpers');
 const productRepository = require('../repositories/productRepository');
 const orderRepository = require('../repositories/orderRepository');
 const { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS } = require('../constants/businessRules');
+const { ORDER_STATUS, CUSTOMER_TYPE, DELIVERY_TYPE, COUPON_CODE } = require('../constants/domain');
 
 function calculateTotals(order) {
   const subtotal = helpers.calculateSubtotal(order.items);
   const customer = db.customers.find((c) => c.id === order.customerId);
   let discount = 0;
 
-  if (customer.type === 'premium') {
+  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
     discount = subtotal * DISCOUNT.PREMIUM_RATE;
   } else {
     if (subtotal >= DISCOUNT.REGULAR_MIN_SUBTOTAL) {
@@ -18,9 +19,9 @@ function calculateTotals(order) {
   }
 
   if (order.coupon) {
-    if (order.coupon === 'CAFE10') {
+    if (order.coupon === COUPON_CODE.CAFE10) {
       discount = discount + subtotal * COUPON.CAFE10_DISCOUNT_RATE;
-    } else if (order.coupon === 'BEMVINDO') {
+    } else if (order.coupon === COUPON_CODE.BEMVINDO) {
       discount = discount + COUPON.BEMVINDO_FIXED_DISCOUNT;
     }
   }
@@ -30,11 +31,11 @@ function calculateTotals(order) {
   }
 
   let deliveryFee = 0;
-  if (order.deliveryType === 'delivery') {
+  if (order.deliveryType === DELIVERY_TYPE.DELIVERY) {
     if (
-      customer.type === 'premium' ||
+      customer.type === CUSTOMER_TYPE.PREMIUM ||
       subtotal >= DELIVERY.FREE_DELIVERY_MIN_SUBTOTAL ||
-      order.coupon === 'FRETEGRATIS'
+      order.coupon === COUPON_CODE.FRETEGRATIS
     ) {
       deliveryFee = 0;
     } else {
@@ -65,11 +66,14 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     return { error: 'Cliente possui muitos pedidos em aberto', status: 409 };
   }
 
-  const selectedDeliveryType = deliveryType || 'pickup';
-  if (selectedDeliveryType !== 'pickup' && selectedDeliveryType !== 'delivery') {
+  const selectedDeliveryType = deliveryType || DELIVERY_TYPE.PICKUP;
+  if (
+    selectedDeliveryType !== DELIVERY_TYPE.PICKUP &&
+    selectedDeliveryType !== DELIVERY_TYPE.DELIVERY
+  ) {
     return { error: 'Tipo de entrega inválido', status: 400 };
   }
-  if (selectedDeliveryType === 'delivery') {
+  if (selectedDeliveryType === DELIVERY_TYPE.DELIVERY) {
     if (!address) {
       return { error: 'Endereço é obrigatório para entrega', status: 400 };
     }
@@ -84,13 +88,13 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     customerId: customer.id,
     items: [],
     deliveryType: selectedDeliveryType,
-    distance: selectedDeliveryType === 'delivery' ? distance : 0,
+    distance: selectedDeliveryType === DELIVERY_TYPE.DELIVERY ? distance : 0,
     address: address || null,
     notes: notes || '',
     coupon: null,
-    status: 'CREATED',
+    status: ORDER_STATUS.CREATED,
     createdAt: helpers.now(),
-    history: [{ status: 'CREATED', at: helpers.now() }],
+    history: [{ status: ORDER_STATUS.CREATED, at: helpers.now() }],
   };
 
   if (items && items.length) {
@@ -137,7 +141,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
 function addItem(req, res) {
   const order = orderRepository.findById(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-  if (order.status !== 'CREATED') {
+  if (order.status !== ORDER_STATUS.CREATED) {
     return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
   }
 
@@ -189,25 +193,25 @@ function applyCoupon(orderId, code) {
     err.status = 404;
     throw err;
   }
-  if (order.status !== 'CREATED') {
+  if (order.status !== ORDER_STATUS.CREATED) {
     const err = new Error('Cupom só pode ser aplicado em pedidos abertos');
     err.status = 400;
     throw err;
   }
 
   const couponCode = (code || '').toUpperCase().trim();
-  const validCoupons = ['CAFE10', 'BEMVINDO', 'FRETEGRATIS'];
+  const validCoupons = [COUPON_CODE.CAFE10, COUPON_CODE.BEMVINDO, COUPON_CODE.FRETEGRATIS];
   if (validCoupons.indexOf(couponCode) === -1) {
     const err = new Error('Cupom inválido');
     err.status = 400;
     throw err;
   }
-  if (couponCode === 'BEMVINDO' && orderRepository.hasPaidOrders(order.customerId)) {
+  if (couponCode === COUPON_CODE.BEMVINDO && orderRepository.hasPaidOrders(order.customerId)) {
     const err = new Error('Cupom válido apenas para a primeira compra');
     err.status = 400;
     throw err;
   }
-  if (couponCode === 'FRETEGRATIS' && order.deliveryType !== 'delivery') {
+  if (couponCode === COUPON_CODE.FRETEGRATIS && order.deliveryType !== DELIVERY_TYPE.DELIVERY) {
     const err = new Error('Cupom válido apenas para pedidos com entrega');
     err.status = 400;
     throw err;

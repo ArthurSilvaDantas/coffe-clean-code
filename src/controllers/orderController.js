@@ -3,6 +3,7 @@ const orderService = require('../services/orderService');
 const orderRepository = require('../repositories/orderRepository');
 const helpers = require('../utils/helpers');
 const { CANCELLATION } = require('../constants/businessRules');
+const { ORDER_STATUS, DELIVERY_TYPE } = require('../constants/domain');
 
 exports.create = (req, res) => {
   const body = req.body || {};
@@ -71,24 +72,24 @@ exports.updateStatus = (req, res) => {
     const newStatus = (req.body || {}).status;
     if (newStatus) {
       let isValidTransition = false;
-      if (order.status === 'PAID') {
-        if (newStatus === 'PREPARING') isValidTransition = true;
-      } else if (order.status === 'PREPARING') {
-        if (newStatus === 'READY') isValidTransition = true;
-      } else if (order.status === 'READY') {
-        if (order.deliveryType === 'delivery') {
-          if (newStatus === 'OUT_FOR_DELIVERY') isValidTransition = true;
+      if (order.status === ORDER_STATUS.PAID) {
+        if (newStatus === ORDER_STATUS.PREPARING) isValidTransition = true;
+      } else if (order.status === ORDER_STATUS.PREPARING) {
+        if (newStatus === ORDER_STATUS.READY) isValidTransition = true;
+      } else if (order.status === ORDER_STATUS.READY) {
+        if (order.deliveryType === DELIVERY_TYPE.DELIVERY) {
+          if (newStatus === ORDER_STATUS.OUT_FOR_DELIVERY) isValidTransition = true;
         } else {
-          if (newStatus === 'DELIVERED') isValidTransition = true;
+          if (newStatus === ORDER_STATUS.DELIVERED) isValidTransition = true;
         }
-      } else if (order.status === 'OUT_FOR_DELIVERY') {
-        if (newStatus === 'DELIVERED') isValidTransition = true;
+      } else if (order.status === ORDER_STATUS.OUT_FOR_DELIVERY) {
+        if (newStatus === ORDER_STATUS.DELIVERED) isValidTransition = true;
       }
 
       if (isValidTransition) {
         order.status = newStatus;
         order.history.push({ status: newStatus, at: new Date().toISOString() });
-        if (newStatus === 'DELIVERED') {
+        if (newStatus === ORDER_STATUS.DELIVERED) {
           order.deliveredAt = new Date().toISOString();
         }
         res.json(order);
@@ -113,17 +114,17 @@ exports.cancel = (req, res) => {
   const reason = (req.body || {}).reason;
 
   let refund;
-  if (order.status === 'CREATED') {
+  if (order.status === ORDER_STATUS.CREATED) {
     refund = 0;
-  } else if (order.status === 'PAID') {
+  } else if (order.status === ORDER_STATUS.PAID) {
     refund = order.payment.total;
-  } else if (order.status === 'PREPARING') {
+  } else if (order.status === ORDER_STATUS.PREPARING) {
     refund = order.payment.total * CANCELLATION.PREPARING_REFUND_RATE;
   } else {
     return res.status(400).json({ message: 'Pedido não pode mais ser cancelado' });
   }
 
-  if (!reason && order.status !== 'CREATED') {
+  if (!reason && order.status !== ORDER_STATUS.CREATED) {
     return res.status(400).json({ message: 'Informe o motivo do cancelamento' });
   }
 
@@ -133,7 +134,7 @@ exports.cancel = (req, res) => {
     product.stock = product.stock + item.quantity;
   }
 
-  if (order.status !== 'CREATED') {
+  if (order.status !== ORDER_STATUS.CREATED) {
     const customer = db.customers.find((c) => c.id === order.customerId);
     customer.points = customer.points - order.payment.points;
     if (customer.points < 0) customer.points = 0;
@@ -141,10 +142,10 @@ exports.cancel = (req, res) => {
     payment.refunded = helpers.roundToCents(refund);
   }
 
-  order.status = 'CANCELLED';
+  order.status = ORDER_STATUS.CANCELLED;
   order.refund = helpers.roundToCents(refund);
   order.cancelReason = reason || null;
-  order.history.push({ status: 'CANCELLED', at: new Date().toISOString() });
+  order.history.push({ status: ORDER_STATUS.CANCELLED, at: new Date().toISOString() });
 
   res.json(order);
 };

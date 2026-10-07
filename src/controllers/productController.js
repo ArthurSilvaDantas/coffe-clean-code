@@ -1,6 +1,7 @@
 const { db } = require('../data/db');
 const productRepository = require('../repositories/productRepository');
 const { PRODUCT_RULES } = require('../constants/businessRules');
+const { PRODUCT_CATEGORY } = require('../constants/domain');
 
 exports.create = (req, res) => {
   const { name, price, stock, category } = req.body || {};
@@ -22,11 +23,11 @@ exports.create = (req, res) => {
     return res.status(400).json({ message: 'Estoque inválido' });
   }
 
-  const selectedCategory = category || 'coffee';
+  const selectedCategory = category || PRODUCT_CATEGORY.COFFEE;
   if (
-    selectedCategory !== 'coffee' &&
-    selectedCategory !== 'food' &&
-    selectedCategory !== 'drink'
+    selectedCategory !== PRODUCT_CATEGORY.COFFEE &&
+    selectedCategory !== PRODUCT_CATEGORY.FOOD &&
+    selectedCategory !== PRODUCT_CATEGORY.DRINK
   ) {
     return res.status(400).json({ message: 'Categoria inválida' });
   }
