@@ -1,7 +1,7 @@
 const orderService = require('./orderService');
-const customerRepository = require('../repositories/customerRepository');
 const productRepository = require('../repositories/productRepository');
 const paymentRepository = require('../repositories/paymentRepository');
+const { reverseLoyaltyPoints } = require('./loyaltyService');
 const helpers = require('../utils/helpers');
 const { CANCELLATION } = require('../constants/businessRules');
 const { ORDER_STATUS, DELIVERY_TYPE } = require('../constants/domain');
@@ -61,11 +61,6 @@ function restoreStock(order) {
   }
 }
 
-function reverseLoyaltyPoints(order) {
-  const customer = customerRepository.findById(order.customerId);
-  customer.points = Math.max(customer.points - order.payment.points, 0);
-}
-
 function cancelOrder(orderId, reason) {
   const order = orderService.getOrder(orderId);
   if (!CANCELLABLE_STATUSES.includes(order.status)) {
@@ -80,7 +75,7 @@ function cancelOrder(orderId, reason) {
   const refund = helpers.roundToCents(calculateRefund(order));
   restoreStock(order);
   if (wasPaid) {
-    reverseLoyaltyPoints(order);
+    reverseLoyaltyPoints(order.customerId, order.payment.points);
     paymentRepository.findByOrderId(order.id).refunded = refund;
   }
 
