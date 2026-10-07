@@ -20,4 +20,10 @@ function decreaseStock(id, quantity) {
   return product;
 }
 
-module.exports = { findAll, findById, save, decreaseStock };
+function increaseStock(id, quantity) {
+  const product = findById(id);
+  product.stock = product.stock + quantity;
+  return product;
+}
+
+module.exports = { findAll, findById, save, decreaseStock, increaseStock };

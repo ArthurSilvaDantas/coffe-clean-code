@@ -1,165 +1,40 @@
-const { db } = require('../data/db');
 const orderService = require('../services/orderService');
-const orderRepository = require('../repositories/orderRepository');
-const helpers = require('../utils/helpers');
-const { CANCELLATION } = require('../constants/businessRules');
-const { ORDER_STATUS, DELIVERY_TYPE } = require('../constants/domain');
+const orderStatusService = require('../services/orderStatusService');
 
 exports.create = (req, res) => {
-  const body = req.body || {};
-  if (!body.customerId) {
-    return res.status(400).json({ error: 'customerId é obrigatório' });
-  }
-  const result = orderService.createOrder(
-    body.customerId,
-    body.deliveryType,
-    body.distance,
-    body.address,
-    body.notes,
-    body.items,
-  );
-  if (result.error) {
-    return res.status(result.status).json({ error: result.error });
-  }
-  res.status(201).json(result.order);
+  const order = orderService.createOrder(req.body || {});
+  res.status(201).json(order);
 };
 
 exports.list = (req, res) => {
-  let orders = db.orders;
-  if (req.query.status) {
-    orders = orders.filter((o) => o.status === req.query.status.toUpperCase());
-  }
-  if (req.query.customerId) {
-    orders = orders.filter((o) => o.customerId === Number(req.query.customerId));
-  }
-  res.json(orders);
+  const { status, customerId } = req.query;
+  res.json(orderService.listOrders({ status, customerId }));
 };
 
 exports.listByCustomer = (req, res) => {
-  const customer = db.customers.find((c) => c.id === Number(req.params.id));
-  if (!customer) {
-    return res.status(404).json({ error: 'Cliente não encontrado' });
-  }
-  let orders = db.orders.filter((o) => o.customerId === customer.id);
-  if (req.query.status) {
-    orders = orders.filter((o) => o.status === req.query.status.toUpperCase());
-  }
-  res.json(orders);
+  res.json(orderService.listCustomerOrders(req.params.id, { status: req.query.status }));
 };
 
 exports.get = (req, res) => {
-  const order = orderRepository.findById(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-  res.json(order);
+  res.json(orderService.getOrder(req.params.id));
 };
 
 exports.addItem = (req, res) => {
-  orderService.addItem(req, res);
+  const order = orderService.addItem(req.params.id, req.body || {});
+  res.status(201).json(order);
 };
 
 exports.applyCoupon = (req, res) => {
-  try {
-    const order = orderService.applyCoupon(req.params.id, (req.body || {}).code);
-    res.json(order);
-  } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
-  }
-};
-
-const NEXT_STATUS = Object.freeze({
-  [ORDER_STATUS.PAID]: ORDER_STATUS.PREPARING,
-  [ORDER_STATUS.PREPARING]: ORDER_STATUS.READY,
-  [ORDER_STATUS.OUT_FOR_DELIVERY]: ORDER_STATUS.DELIVERED,
-});
-
-function getNextStatus(order) {
-  if (order.status !== ORDER_STATUS.READY) {
-    return NEXT_STATUS[order.status];
-  }
-  return order.deliveryType === DELIVERY_TYPE.DELIVERY
-    ? ORDER_STATUS.OUT_FOR_DELIVERY
-    : ORDER_STATUS.DELIVERED;
-}
-
-exports.updateStatus = (req, res) => {
-  const order = orderRepository.findById(req.params.id);
-  if (!order) {
-    return res.status(404).json({ error: 'Pedido não encontrado' });
-  }
-
-  const newStatus = (req.body || {}).status;
-  if (!newStatus) {
-    return res.status(400).json({ error: 'Status é obrigatório' });
-  }
-  if (newStatus !== getNextStatus(order)) {
-    return res
-      .status(400)
-      .json({ error: 'Transição de status inválida: ' + order.status + ' -> ' + newStatus });
-  }
-
-  order.status = newStatus;
-  order.history.push({ status: newStatus, at: new Date().toISOString() });
-  if (newStatus === ORDER_STATUS.DELIVERED) {
-    order.deliveredAt = new Date().toISOString();
-  }
+  const order = orderService.applyCoupon(req.params.id, (req.body || {}).code);
   res.json(order);
 };
 
-const CANCELLABLE_STATUSES = Object.freeze([
-  ORDER_STATUS.CREATED,
-  ORDER_STATUS.PAID,
-  ORDER_STATUS.PREPARING,
-]);
-
-function calculateRefund(order) {
-  if (order.status === ORDER_STATUS.PAID) {
-    return order.payment.total;
-  }
-  if (order.status === ORDER_STATUS.PREPARING) {
-    return order.payment.total * CANCELLATION.PREPARING_REFUND_RATE;
-  }
-  return 0;
-}
-
-function restoreStock(order) {
-  for (const item of order.items) {
-    const product = db.products.find((p) => p.id === item.productId);
-    product.stock = product.stock + item.quantity;
-  }
-}
-
-function reverseLoyaltyPoints(order) {
-  const customer = db.customers.find((c) => c.id === order.customerId);
-  customer.points = Math.max(customer.points - order.payment.points, 0);
-}
+exports.updateStatus = (req, res) => {
+  const order = orderStatusService.updateStatus(req.params.id, (req.body || {}).status);
+  res.json(order);
+};
 
 exports.cancel = (req, res) => {
-  const order = orderRepository.findById(req.params.id);
-  if (!order) {
-    return res.status(404).json({ error: 'Pedido não encontrado' });
-  }
-  if (!CANCELLABLE_STATUSES.includes(order.status)) {
-    return res.status(400).json({ message: 'Pedido não pode mais ser cancelado' });
-  }
-
-  const reason = (req.body || {}).reason;
-  const wasPaid = order.status !== ORDER_STATUS.CREATED;
-  if (wasPaid && !reason) {
-    return res.status(400).json({ message: 'Informe o motivo do cancelamento' });
-  }
-
-  const refund = helpers.roundToCents(calculateRefund(order));
-  restoreStock(order);
-  if (wasPaid) {
-    reverseLoyaltyPoints(order);
-    const payment = db.payments.find((storedPayment) => storedPayment.orderId === order.id);
-    payment.refunded = refund;
-  }
-
-  order.status = ORDER_STATUS.CANCELLED;
-  order.refund = refund;
-  order.cancelReason = reason || null;
-  order.history.push({ status: ORDER_STATUS.CANCELLED, at: new Date().toISOString() });
-
+  const order = orderStatusService.cancelOrder(req.params.id, (req.body || {}).reason);
   res.json(order);
 };
