@@ -5,48 +5,54 @@ const orderRepository = require('../repositories/orderRepository');
 const { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS } = require('../constants/businessRules');
 const { ORDER_STATUS, CUSTOMER_TYPE, DELIVERY_TYPE, COUPON_CODE } = require('../constants/domain');
 
+function calculateCustomerDiscount(customer, subtotal) {
+  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
+    return subtotal * DISCOUNT.PREMIUM_RATE;
+  }
+  if (subtotal >= DISCOUNT.REGULAR_MIN_SUBTOTAL) {
+    return subtotal * DISCOUNT.REGULAR_RATE;
+  }
+  return 0;
+}
+
+function calculateCouponDiscount(coupon, subtotal) {
+  if (coupon === COUPON_CODE.CAFE10) {
+    return subtotal * COUPON.CAFE10_DISCOUNT_RATE;
+  }
+  if (coupon === COUPON_CODE.BEMVINDO) {
+    return COUPON.BEMVINDO_FIXED_DISCOUNT;
+  }
+  return 0;
+}
+
+function calculateDiscount(order, customer, subtotal) {
+  const discount =
+    calculateCustomerDiscount(customer, subtotal) + calculateCouponDiscount(order.coupon, subtotal);
+  return Math.min(discount, subtotal * DISCOUNT.MAX_RATE);
+}
+
+function calculateDeliveryFee(order, customer, subtotal) {
+  if (order.deliveryType !== DELIVERY_TYPE.DELIVERY) {
+    return 0;
+  }
+
+  const hasFreeDelivery =
+    customer.type === CUSTOMER_TYPE.PREMIUM ||
+    subtotal >= DELIVERY.FREE_DELIVERY_MIN_SUBTOTAL ||
+    order.coupon === COUPON_CODE.FRETEGRATIS;
+  if (hasFreeDelivery) {
+    return 0;
+  }
+
+  const extraDistance = Math.max(order.distance - DELIVERY.INCLUDED_DISTANCE_KM, 0);
+  return DELIVERY.BASE_FEE + extraDistance * DELIVERY.FEE_PER_EXTRA_KM;
+}
+
 function calculateTotals(order) {
   const subtotal = helpers.calculateSubtotal(order.items);
   const customer = db.customers.find((c) => c.id === order.customerId);
-  let discount = 0;
-
-  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
-    discount = subtotal * DISCOUNT.PREMIUM_RATE;
-  } else {
-    if (subtotal >= DISCOUNT.REGULAR_MIN_SUBTOTAL) {
-      discount = subtotal * DISCOUNT.REGULAR_RATE;
-    }
-  }
-
-  if (order.coupon) {
-    if (order.coupon === COUPON_CODE.CAFE10) {
-      discount = discount + subtotal * COUPON.CAFE10_DISCOUNT_RATE;
-    } else if (order.coupon === COUPON_CODE.BEMVINDO) {
-      discount = discount + COUPON.BEMVINDO_FIXED_DISCOUNT;
-    }
-  }
-
-  if (discount > subtotal * DISCOUNT.MAX_RATE) {
-    discount = subtotal * DISCOUNT.MAX_RATE;
-  }
-
-  let deliveryFee = 0;
-  if (order.deliveryType === DELIVERY_TYPE.DELIVERY) {
-    if (
-      customer.type === CUSTOMER_TYPE.PREMIUM ||
-      subtotal >= DELIVERY.FREE_DELIVERY_MIN_SUBTOTAL ||
-      order.coupon === COUPON_CODE.FRETEGRATIS
-    ) {
-      deliveryFee = 0;
-    } else {
-      deliveryFee = DELIVERY.BASE_FEE;
-      if (order.distance > DELIVERY.INCLUDED_DISTANCE_KM) {
-        deliveryFee =
-          deliveryFee +
-          (order.distance - DELIVERY.INCLUDED_DISTANCE_KM) * DELIVERY.FEE_PER_EXTRA_KM;
-      }
-    }
-  }
+  const discount = calculateDiscount(order, customer, subtotal);
+  const deliveryFee = calculateDeliveryFee(order, customer, subtotal);
 
   order.subtotal = helpers.roundToCents(subtotal);
   order.discount = helpers.roundToCents(discount);
