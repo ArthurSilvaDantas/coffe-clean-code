@@ -10,7 +10,7 @@ function doIt(id, data) {
     if (purchase.items.length > 0) {
       const user = db.customers.find((c) => c.id == purchase.clientId);
       let value = purchase.amount;
-      let extra = {};
+      const extra = {};
 
       if (data.method == 'pix') {
         value = value - value * 0.05;
@@ -19,7 +19,7 @@ function doIt(id, data) {
         if (!helpers.isValidCard(data.cardNumber)) {
           return { ok: false, code: 400, msg: 'Cartão inválido' };
         }
-        let n = data.installments || 1;
+        const n = data.installments || 1;
         if (n < 1 || n > 12) {
           return { ok: false, code: 400, msg: 'Número de parcelas inválido' };
         } else {
@@ -42,7 +42,7 @@ function doIt(id, data) {
         if (data.cashGiven == undefined || data.cashGiven < value) {
           return { ok: false, code: 400, msg: 'Valor em dinheiro insuficiente' };
         }
-        let change = data.cashGiven - value;
+        const change = data.cashGiven - value;
         if (purchase.deliveryType == 'delivery' && change > 50) {
           return { ok: false, code: 400, msg: 'Troco máximo para entrega é de R$ 50,00' };
         }

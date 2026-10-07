@@ -6,15 +6,15 @@ function round(n) {
 
 // calcula
 function calc(list) {
-  var t = 0;
-  for (var i = 0; i < list.length; i++) {
+  let t = 0;
+  for (let i = 0; i < list.length; i++) {
     t = t + list[i].value * list[i].qty;
   }
   return round(t);
 }
 
 function isValidCard(n) {
-  if (typeof n != 'string') return false;
+  if (typeof n !== 'string') return false;
   const digits = n.replace(/\s/g, '');
   return digits.length == 16 && /^\d+$/.test(digits);
 }

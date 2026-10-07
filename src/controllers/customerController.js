@@ -1,6 +1,5 @@
 const customerRepository = require('../repositories/customerRepository');
 const { db } = require('../data/db');
-const helpers = require('../utils/helpers');
 
 function create(req, res) {
   const data = req.body || {};

@@ -1,7 +1,6 @@
 const { db } = require('../data/db');
 const orderService = require('../services/orderService');
 const orderRepository = require('../repositories/orderRepository');
-const helpers = require('../utils/helpers');
 
 exports.create = (req, res) => {
   const body = req.body || {};
@@ -111,7 +110,7 @@ exports.cancel = (req, res) => {
   }
   const reason = (req.body || {}).reason;
 
-  let refund = 0;
+  let refund;
   if (order.status == 'CREATED') {
     refund = 0;
   } else if (order.status == 'PAID') {
