@@ -51,7 +51,7 @@ exports.get = (req, res) => {
 };
 
 exports.addItem = (req, res) => {
-  orderService.handle(req, res);
+  orderService.addItem(req, res);
 };
 
 exports.applyCoupon = (req, res) => {

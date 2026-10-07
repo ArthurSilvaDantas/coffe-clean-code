@@ -2,7 +2,7 @@ const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
 
-function doIt(id, data) {
+function payOrder(id, data) {
   const order = orderRepository.getOrder(id);
   if (!order) return { ok: false, code: 404, msg: 'Pedido não encontrado' };
 
@@ -31,7 +31,7 @@ function doIt(id, data) {
           }
         }
         extra.installments = n;
-        extra.installmentValue = helpers.round(total / n);
+        extra.installmentValue = helpers.roundToCents(total / n);
         extra.card = helpers.maskCard(data.cardNumber);
       } else if (data.method === 'debit_card') {
         if (!helpers.isValidCard(data.cardNumber)) {
@@ -47,12 +47,12 @@ function doIt(id, data) {
           return { ok: false, code: 400, msg: 'Troco máximo para entrega é de R$ 50,00' };
         }
         extra.cashGiven = data.cashGiven;
-        extra.change = helpers.round(change);
+        extra.change = helpers.roundToCents(change);
       } else {
         return { ok: false, code: 400, msg: 'Forma de pagamento inválida' };
       }
 
-      total = helpers.round(total);
+      total = helpers.roundToCents(total);
 
       // pontos de fidelidade
       let points = Math.floor(total);
@@ -88,4 +88,4 @@ function doIt(id, data) {
   }
 }
 
-module.exports = { doIt };
+module.exports = { payOrder };

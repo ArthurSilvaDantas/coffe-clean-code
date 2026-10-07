@@ -1,16 +1,16 @@
 // Funções auxiliares
 
-function round(n) {
+function roundToCents(n) {
   return Math.round(n * 100) / 100;
 }
 
 // calcula
-function calc(list) {
+function calculateSubtotal(list) {
   let t = 0;
   for (let i = 0; i < list.length; i++) {
     t = t + list[i].price * list[i].quantity;
   }
-  return round(t);
+  return roundToCents(t);
 }
 
 function isValidCard(n) {
@@ -35,4 +35,4 @@ function fail(res, code, msg) {
   return res.status(code).json({ error: msg });
 }
 
-module.exports = { round, calc, isValidCard, maskCard, isPremium, now, fail };
+module.exports = { roundToCents, calculateSubtotal, isValidCard, maskCard, isPremium, now, fail };

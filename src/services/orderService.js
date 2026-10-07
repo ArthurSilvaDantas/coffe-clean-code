@@ -3,8 +3,8 @@ const helpers = require('../utils/helpers');
 const productRepository = require('../repositories/productRepository');
 const orderRepository = require('../repositories/orderRepository');
 
-function doCalc(o) {
-  const subtotal = helpers.calc(o.items);
+function calculateTotals(o) {
+  const subtotal = helpers.calculateSubtotal(o.items);
   const customer = db.customers.find((c) => c.id === o.customerId);
   let discount = 0;
 
@@ -40,10 +40,10 @@ function doCalc(o) {
     }
   }
 
-  o.subtotal = helpers.round(subtotal);
-  o.discount = helpers.round(discount);
-  o.deliveryFee = helpers.round(fee);
-  o.total = helpers.round(subtotal - discount + fee);
+  o.subtotal = helpers.roundToCents(subtotal);
+  o.discount = helpers.roundToCents(discount);
+  o.deliveryFee = helpers.roundToCents(fee);
+  o.total = helpers.roundToCents(subtotal - discount + fee);
   return o;
 }
 
@@ -108,12 +108,12 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     }
   }
 
-  doCalc(order);
+  calculateTotals(order);
   orderRepository.saveOrder(order);
   return { order };
 }
 
-function handle(req, res) {
+function addItem(req, res) {
   const o = orderRepository.getOrder(req.params.id);
   if (!o) return res.status(404).json({ error: 'Pedido não encontrado' });
   if (o.status !== 'CREATED') {
@@ -156,7 +156,7 @@ function handle(req, res) {
     o.items.push({ productId: p.id, name: p.name, price: p.price, quantity });
   }
 
-  doCalc(o);
+  calculateTotals(o);
   res.status(201).json(o);
 }
 
@@ -192,7 +192,7 @@ function applyCoupon(orderId, code) {
   }
 
   o.coupon = c;
-  return doCalc(o);
+  return calculateTotals(o);
 }
 
-module.exports = { doCalc, createOrder, handle, applyCoupon };
+module.exports = { calculateTotals, createOrder, addItem, applyCoupon };
