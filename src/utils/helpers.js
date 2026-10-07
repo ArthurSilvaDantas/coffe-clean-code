@@ -1,10 +1,7 @@
-// Funções auxiliares
-
 function roundToCents(value) {
   return Math.round(value * 100) / 100;
 }
 
-// calcula
 function calculateSubtotal(items) {
   let subtotal = 0;
   for (let i = 0; i < items.length; i++) {

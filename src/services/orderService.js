@@ -155,7 +155,6 @@ function addItem(req, res) {
     return res.status(400).json({ error: 'Limite de itens atingido' });
   }
 
-  // diminui o estoque
   product.stock = product.stock - quantity;
 
   if (existingItem) {
