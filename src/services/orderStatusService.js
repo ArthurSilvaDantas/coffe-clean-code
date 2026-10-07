@@ -2,8 +2,9 @@ const orderService = require('./orderService');
 const productRepository = require('../repositories/productRepository');
 const paymentRepository = require('../repositories/paymentRepository');
 const { reverseLoyaltyPoints } = require('./loyaltyService');
-const helpers = require('../utils/helpers');
+const { roundToCents } = require('../utils/money');
 const { CANCELLATION } = require('../constants/businessRules');
+const { now } = require('../utils/date');
 const { ORDER_STATUS, DELIVERY_TYPE } = require('../constants/domain');
 const { badRequest } = require('../errors/AppError');
 
@@ -38,9 +39,9 @@ function updateStatus(orderId, newStatus) {
   }
 
   order.status = newStatus;
-  order.history.push({ status: newStatus, at: new Date().toISOString() });
+  order.history.push({ status: newStatus, at: now() });
   if (newStatus === ORDER_STATUS.DELIVERED) {
-    order.deliveredAt = new Date().toISOString();
+    order.deliveredAt = now();
   }
   return order;
 }
@@ -72,7 +73,7 @@ function cancelOrder(orderId, reason) {
     throw badRequest('Informe o motivo do cancelamento');
   }
 
-  const refund = helpers.roundToCents(calculateRefund(order));
+  const refund = roundToCents(calculateRefund(order));
   restoreStock(order);
   if (wasPaid) {
     reverseLoyaltyPoints(order.customerId, order.payment.points);
@@ -82,7 +83,7 @@ function cancelOrder(orderId, reason) {
   order.status = ORDER_STATUS.CANCELLED;
   order.refund = refund;
   order.cancelReason = reason || null;
-  order.history.push({ status: ORDER_STATUS.CANCELLED, at: new Date().toISOString() });
+  order.history.push({ status: ORDER_STATUS.CANCELLED, at: now() });
   return order;
 }
 

@@ -1,4 +1,4 @@
-const helpers = require('../utils/helpers');
+const { now } = require('../utils/date');
 const productRepository = require('../repositories/productRepository');
 const orderRepository = require('../repositories/orderRepository');
 const customerRepository = require('../repositories/customerRepository');
@@ -93,8 +93,8 @@ function createOrder({ customerId, deliveryType, distance, address, notes, items
     notes: notes || '',
     coupon: null,
     status: ORDER_STATUS.CREATED,
-    createdAt: helpers.now(),
-    history: [{ status: ORDER_STATUS.CREATED, at: helpers.now() }],
+    createdAt: now(),
+    history: [{ status: ORDER_STATUS.CREATED, at: now() }],
   };
 
   addRequestedItems(order, requestedItems);

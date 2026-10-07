@@ -1,7 +1,11 @@
-const helpers = require('../utils/helpers');
+const { roundToCents } = require('../utils/money');
 const customerRepository = require('../repositories/customerRepository');
 const { DISCOUNT, COUPON, DELIVERY } = require('../constants/businessRules');
 const { CUSTOMER_TYPE, DELIVERY_TYPE, COUPON_CODE } = require('../constants/domain');
+
+function calculateSubtotal(items) {
+  return roundToCents(items.reduce((subtotal, item) => subtotal + item.price * item.quantity, 0));
+}
 
 function calculateCustomerDiscount(customer, subtotal) {
   if (customer.type === CUSTOMER_TYPE.PREMIUM) {
@@ -47,15 +51,15 @@ function calculateDeliveryFee(order, customer, subtotal) {
 }
 
 function calculateTotals(order) {
-  const subtotal = helpers.calculateSubtotal(order.items);
+  const subtotal = calculateSubtotal(order.items);
   const customer = customerRepository.findById(order.customerId);
   const discount = calculateDiscount(order, customer, subtotal);
   const deliveryFee = calculateDeliveryFee(order, customer, subtotal);
 
-  order.subtotal = helpers.roundToCents(subtotal);
-  order.discount = helpers.roundToCents(discount);
-  order.deliveryFee = helpers.roundToCents(deliveryFee);
-  order.total = helpers.roundToCents(subtotal - discount + deliveryFee);
+  order.subtotal = roundToCents(subtotal);
+  order.discount = roundToCents(discount);
+  order.deliveryFee = roundToCents(deliveryFee);
+  order.total = roundToCents(subtotal - discount + deliveryFee);
   return order;
 }
 

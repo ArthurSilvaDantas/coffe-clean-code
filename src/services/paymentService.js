@@ -1,4 +1,5 @@
-const helpers = require('../utils/helpers');
+const { roundToCents } = require('../utils/money');
+const { now } = require('../utils/date');
 const orderRepository = require('../repositories/orderRepository');
 const paymentRepository = require('../repositories/paymentRepository');
 const { getPaymentHandler } = require('./paymentMethods');
@@ -28,7 +29,7 @@ function payOrder(orderId, paymentData) {
 
   const methodResult = payWithMethod({ total: order.total, paymentData, order });
 
-  const total = helpers.roundToCents(methodResult.total);
+  const total = roundToCents(methodResult.total);
   const points = awardLoyaltyPoints(order.customerId, total);
 
   const payment = paymentRepository.save({
@@ -37,7 +38,7 @@ function payOrder(orderId, paymentData) {
     total,
     points,
     ...methodResult.details,
-    paidAt: helpers.now(),
+    paidAt: now(),
   });
 
   order.status = ORDER_STATUS.PAID;

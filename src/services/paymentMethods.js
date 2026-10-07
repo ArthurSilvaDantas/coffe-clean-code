@@ -1,4 +1,5 @@
-const helpers = require('../utils/helpers');
+const { isValidCard, maskCard } = require('../utils/card');
+const { formatCurrency, roundToCents } = require('../utils/money');
 const { PAYMENT } = require('../constants/businessRules');
 const { DELIVERY_TYPE, PAYMENT_METHOD } = require('../constants/domain');
 const { badRequest } = require('../errors/AppError');
@@ -22,7 +23,7 @@ function calculateInstallmentInterest(total, installments) {
 }
 
 function payWithCreditCard({ total, paymentData }) {
-  if (!helpers.isValidCard(paymentData.cardNumber)) {
+  if (!isValidCard(paymentData.cardNumber)) {
     throw badRequest('Cartão inválido');
   }
 
@@ -34,7 +35,7 @@ function payWithCreditCard({ total, paymentData }) {
   const isInstallmentTooSmall =
     installments > PAYMENT.MIN_INSTALLMENTS && total / installments < PAYMENT.MIN_INSTALLMENT_VALUE;
   if (isInstallmentTooSmall) {
-    const minInstallmentValue = helpers.formatCurrency(PAYMENT.MIN_INSTALLMENT_VALUE);
+    const minInstallmentValue = formatCurrency(PAYMENT.MIN_INSTALLMENT_VALUE);
     throw badRequest(`O valor mínimo da parcela é ${minInstallmentValue}`);
   }
 
@@ -43,17 +44,17 @@ function payWithCreditCard({ total, paymentData }) {
     total: totalWithInterest,
     details: {
       installments,
-      installmentValue: helpers.roundToCents(totalWithInterest / installments),
-      card: helpers.maskCard(paymentData.cardNumber),
+      installmentValue: roundToCents(totalWithInterest / installments),
+      card: maskCard(paymentData.cardNumber),
     },
   };
 }
 
 function payWithDebitCard({ total, paymentData }) {
-  if (!helpers.isValidCard(paymentData.cardNumber)) {
+  if (!isValidCard(paymentData.cardNumber)) {
     throw badRequest('Cartão inválido');
   }
-  return { total, details: { card: helpers.maskCard(paymentData.cardNumber) } };
+  return { total, details: { card: maskCard(paymentData.cardNumber) } };
 }
 
 function payWithCash({ total, paymentData, order }) {
@@ -65,13 +66,13 @@ function payWithCash({ total, paymentData, order }) {
   const isChangeAboveDeliveryLimit =
     order.deliveryType === DELIVERY_TYPE.DELIVERY && change > PAYMENT.MAX_CHANGE_FOR_DELIVERY;
   if (isChangeAboveDeliveryLimit) {
-    const maxChange = helpers.formatCurrency(PAYMENT.MAX_CHANGE_FOR_DELIVERY);
+    const maxChange = formatCurrency(PAYMENT.MAX_CHANGE_FOR_DELIVERY);
     throw badRequest(`Troco máximo para entrega é de ${maxChange}`);
   }
 
   return {
     total,
-    details: { cashGiven: paymentData.cashGiven, change: helpers.roundToCents(change) },
+    details: { cashGiven: paymentData.cashGiven, change: roundToCents(change) },
   };
 }
 

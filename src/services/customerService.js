@@ -1,4 +1,5 @@
 const customerRepository = require('../repositories/customerRepository');
+const { now } = require('../utils/date');
 const { CUSTOMER_RULES } = require('../constants/businessRules');
 const { CUSTOMER_TYPE } = require('../constants/domain');
 const { badRequest, conflict, notFound } = require('../errors/AppError');
@@ -33,7 +34,7 @@ function createCustomer({ name, email, phone, type }) {
     phone: phone || null,
     type: customerType,
     points: 0,
-    createdAt: new Date().toISOString(),
+    createdAt: now(),
   });
 }
 
