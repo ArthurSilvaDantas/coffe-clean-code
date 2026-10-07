@@ -45,7 +45,7 @@ exports.listByCustomer = (req, res) => {
 };
 
 exports.get = (req, res) => {
-  const order = orderRepository.getOrder(req.params.id);
+  const order = orderRepository.findById(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   res.json(order);
 };
@@ -64,7 +64,7 @@ exports.applyCoupon = (req, res) => {
 };
 
 exports.updateStatus = (req, res) => {
-  const order = orderRepository.getOrder(req.params.id);
+  const order = orderRepository.findById(req.params.id);
   if (order) {
     const newStatus = (req.body || {}).status;
     if (newStatus) {
@@ -104,7 +104,7 @@ exports.updateStatus = (req, res) => {
 };
 
 exports.cancel = (req, res) => {
-  const order = orderRepository.getOrder(req.params.id);
+  const order = orderRepository.findById(req.params.id);
   if (!order) {
     return res.status(404).json({ error: 'Pedido não encontrado' });
   }

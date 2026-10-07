@@ -24,7 +24,7 @@ exports.create = (req, res) => {
     return res.status(400).json({ message: 'Categoria inválida' });
   }
 
-  const product = productRepository.addProduct({
+  const product = productRepository.save({
     name: name.trim(),
     price,
     stock: initialStock,

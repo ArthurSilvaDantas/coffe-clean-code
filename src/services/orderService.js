@@ -86,7 +86,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
 
   if (items && items.length) {
     for (const requestedItem of items) {
-      const product = productRepository.getProduct(requestedItem.productId);
+      const product = productRepository.findById(requestedItem.productId);
       if (!product || !product.active) {
         return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
       }
@@ -117,12 +117,12 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   }
 
   calculateTotals(order);
-  orderRepository.saveOrder(order);
+  orderRepository.save(order);
   return { order };
 }
 
 function addItem(req, res) {
-  const order = orderRepository.getOrder(req.params.id);
+  const order = orderRepository.findById(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
   if (order.status !== 'CREATED') {
     return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
@@ -169,7 +169,7 @@ function addItem(req, res) {
 }
 
 function applyCoupon(orderId, code) {
-  const order = orderRepository.getOrder(orderId);
+  const order = orderRepository.findById(orderId);
   if (!order) {
     const err = new Error('Pedido não encontrado');
     err.status = 404;

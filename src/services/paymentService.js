@@ -3,7 +3,7 @@ const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
 
 function payOrder(orderId, paymentData) {
-  const order = orderRepository.getOrder(orderId);
+  const order = orderRepository.findById(orderId);
   if (!order) return { ok: false, status: 404, message: 'Pedido não encontrado' };
 
   if (order.status === 'CREATED') {

@@ -38,7 +38,7 @@ function create(req, res) {
 }
 
 function list(req, res) {
-  let customers = customerRepository.all();
+  let customers = customerRepository.findAll();
   if (req.query.type) {
     customers = customers.filter((c) => c.type === req.query.type);
   }

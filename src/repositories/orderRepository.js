@@ -1,12 +1,12 @@
 const { db } = require('../data/db');
 
-function saveOrder(order) {
+function save(order) {
   order.id = db.counters.order++;
   db.orders.push(order);
   return order;
 }
 
-function getOrder(id) {
+function findById(id) {
   return db.orders.find((o) => o.id === Number(id));
 }
 
@@ -20,4 +20,4 @@ function hasPaidOrders(customerId) {
   );
 }
 
-module.exports = { saveOrder, getOrder, countOpenByCustomer, hasPaidOrders };
+module.exports = { save, findById, countOpenByCustomer, hasPaidOrders };

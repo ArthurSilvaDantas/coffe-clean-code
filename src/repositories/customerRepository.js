@@ -14,8 +14,8 @@ function findByEmail(email) {
   return db.customers.find((c) => c.email.toLowerCase() === email.toLowerCase());
 }
 
-function all() {
+function findAll() {
   return db.customers;
 }
 
-module.exports = { save, findById, findByEmail, all };
+module.exports = { save, findById, findByEmail, findAll };
