@@ -1,6 +1,7 @@
 const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
+const { PAYMENT, LOYALTY } = require('../constants/businessRules');
 
 function payOrder(orderId, paymentData) {
   const order = orderRepository.findById(orderId);
@@ -13,21 +14,33 @@ function payOrder(orderId, paymentData) {
       const methodDetails = {};
 
       if (paymentData.method === 'pix') {
-        total = total - total * 0.05;
-        methodDetails.pixKey = 'pagamentos@cafeteria.com';
+        total = total - total * PAYMENT.PIX_DISCOUNT_RATE;
+        methodDetails.pixKey = PAYMENT.PIX_KEY;
       } else if (paymentData.method === 'credit_card') {
         if (!helpers.isValidCard(paymentData.cardNumber)) {
           return { ok: false, status: 400, message: 'Cartão inválido' };
         }
-        const installments = paymentData.installments || 1;
-        if (installments < 1 || installments > 12) {
+        const installments = paymentData.installments || PAYMENT.MIN_INSTALLMENTS;
+        if (installments < PAYMENT.MIN_INSTALLMENTS || installments > PAYMENT.MAX_INSTALLMENTS) {
           return { ok: false, status: 400, message: 'Número de parcelas inválido' };
         } else {
-          if (installments > 1 && total / installments < 10) {
-            return { ok: false, status: 400, message: 'O valor mínimo da parcela é R$ 10,00' };
+          if (
+            installments > PAYMENT.MIN_INSTALLMENTS &&
+            total / installments < PAYMENT.MIN_INSTALLMENT_VALUE
+          ) {
+            const minInstallmentValue = helpers.formatCurrency(PAYMENT.MIN_INSTALLMENT_VALUE);
+            return {
+              ok: false,
+              status: 400,
+              message: `O valor mínimo da parcela é ${minInstallmentValue}`,
+            };
           }
-          if (installments > 3) {
-            total = total + total * 0.02 * (installments - 3);
+          if (installments > PAYMENT.INTEREST_FREE_INSTALLMENTS) {
+            total =
+              total +
+              total *
+                PAYMENT.INTEREST_RATE_PER_EXTRA_INSTALLMENT *
+                (installments - PAYMENT.INTEREST_FREE_INSTALLMENTS);
           }
         }
         methodDetails.installments = installments;
@@ -43,8 +56,13 @@ function payOrder(orderId, paymentData) {
           return { ok: false, status: 400, message: 'Valor em dinheiro insuficiente' };
         }
         const change = paymentData.cashGiven - total;
-        if (order.deliveryType === 'delivery' && change > 50) {
-          return { ok: false, status: 400, message: 'Troco máximo para entrega é de R$ 50,00' };
+        if (order.deliveryType === 'delivery' && change > PAYMENT.MAX_CHANGE_FOR_DELIVERY) {
+          const maxChange = helpers.formatCurrency(PAYMENT.MAX_CHANGE_FOR_DELIVERY);
+          return {
+            ok: false,
+            status: 400,
+            message: `Troco máximo para entrega é de ${maxChange}`,
+          };
         }
         methodDetails.cashGiven = paymentData.cashGiven;
         methodDetails.change = helpers.roundToCents(change);
@@ -55,10 +73,10 @@ function payOrder(orderId, paymentData) {
       total = helpers.roundToCents(total);
 
       // pontos de fidelidade
-      let points = Math.floor(total);
-      if (customer.type === 'premium') points = points * 2;
+      let points = Math.floor(total * LOYALTY.POINTS_PER_REAL);
+      if (customer.type === 'premium') points = points * LOYALTY.PREMIUM_POINTS_MULTIPLIER;
       customer.points = customer.points + points;
-      if (customer.type === 'regular' && customer.points >= 200) {
+      if (customer.type === 'regular' && customer.points >= LOYALTY.PREMIUM_UPGRADE_POINTS) {
         customer.type = 'premium';
       }
 
