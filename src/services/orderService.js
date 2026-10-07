@@ -177,15 +177,8 @@ function addItem(req, res) {
   const product = db.products.find((p) => p.id === Number(productId));
   if (!product || !product.active) return res.status(404).json({ error: 'Produto não encontrado' });
 
-  let existingItem = null;
-  for (let i = 0; i < order.items.length; i++) {
-    if (order.items[i].productId === product.id) {
-      existingItem = order.items[i];
-    }
-  }
-
-  let totalQuantity = quantity;
-  if (existingItem) totalQuantity = existingItem.quantity + quantity;
+  const existingItem = order.items.find((item) => item.productId === product.id);
+  const totalQuantity = existingItem ? existingItem.quantity + quantity : quantity;
   if (totalQuantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT) {
     return res
       .status(400)

@@ -6,15 +6,14 @@ const { PRODUCT_CATEGORY } = require('../constants/domain');
 exports.create = (req, res) => {
   const { name, price, stock, category } = req.body || {};
   if (!name || name.trim() === '') return res.status(400).json({ error: 'Nome é obrigatório' });
-  if (price === undefined || typeof price !== 'number' || price <= 0) {
+  if (typeof price !== 'number' || price <= 0) {
     return res.status(400).json({ error: 'Preço inválido' });
   }
   if (price > PRODUCT_RULES.MAX_PRICE) {
     return res.status(400).json({ error: 'Preço acima do permitido' });
   }
 
-  let initialStock = stock;
-  if (initialStock === undefined) initialStock = 0;
+  const initialStock = stock === undefined ? 0 : stock;
   if (
     typeof initialStock !== 'number' ||
     initialStock < 0 ||
