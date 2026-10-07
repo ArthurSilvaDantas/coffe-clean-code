@@ -6,16 +6,16 @@ function doIt(id, data) {
   const purchase = orderRepository.getPurchase(id);
   if (!purchase) return { ok: false, code: 404, msg: 'Pedido não encontrado' };
 
-  if (purchase.status == 'CREATED') {
+  if (purchase.status === 'CREATED') {
     if (purchase.items.length > 0) {
-      const user = db.customers.find((c) => c.id == purchase.clientId);
+      const user = db.customers.find((c) => c.id === purchase.clientId);
       let value = purchase.amount;
       const extra = {};
 
-      if (data.method == 'pix') {
+      if (data.method === 'pix') {
         value = value - value * 0.05;
         extra.pixKey = 'pagamentos@cafeteria.com';
-      } else if (data.method == 'credit_card') {
+      } else if (data.method === 'credit_card') {
         if (!helpers.isValidCard(data.cardNumber)) {
           return { ok: false, code: 400, msg: 'Cartão inválido' };
         }
@@ -33,17 +33,17 @@ function doIt(id, data) {
         extra.installments = n;
         extra.installmentValue = helpers.round(value / n);
         extra.card = helpers.maskCard(data.cardNumber);
-      } else if (data.method == 'debit_card') {
+      } else if (data.method === 'debit_card') {
         if (!helpers.isValidCard(data.cardNumber)) {
           return { ok: false, code: 400, msg: 'Cartão inválido' };
         }
         extra.card = helpers.maskCard(data.cardNumber);
-      } else if (data.method == 'cash') {
-        if (data.cashGiven == undefined || data.cashGiven < value) {
+      } else if (data.method === 'cash') {
+        if (data.cashGiven === undefined || data.cashGiven < value) {
           return { ok: false, code: 400, msg: 'Valor em dinheiro insuficiente' };
         }
         const change = data.cashGiven - value;
-        if (purchase.deliveryType == 'delivery' && change > 50) {
+        if (purchase.deliveryType === 'delivery' && change > 50) {
           return { ok: false, code: 400, msg: 'Troco máximo para entrega é de R$ 50,00' };
         }
         extra.cashGiven = data.cashGiven;
@@ -56,9 +56,9 @@ function doIt(id, data) {
 
       // pontos de fidelidade
       let points = Math.floor(value);
-      if (user.type == 'premium') points = points * 2;
+      if (user.type === 'premium') points = points * 2;
       user.points = user.points + points;
-      if (user.type == 'regular' && user.points >= 200) {
+      if (user.type === 'regular' && user.points >= 200) {
         user.type = 'premium';
       }
 
@@ -81,7 +81,7 @@ function doIt(id, data) {
     } else {
       return { ok: false, code: 400, msg: 'Pedido sem itens' };
     }
-  } else if (purchase.status == 'CANCELLED') {
+  } else if (purchase.status === 'CANCELLED') {
     return { ok: false, code: 400, msg: 'Pedido cancelado' };
   } else {
     return { ok: false, code: 409, msg: 'Pedido já foi pago' };

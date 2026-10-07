@@ -6,18 +6,18 @@ function create(req, res) {
   if (!data.name || data.name.trim().length < 3) {
     return res.status(400).json({ error: 'Nome inválido' });
   }
-  if (!data.email || data.email.indexOf('@') == -1) {
+  if (!data.email || data.email.indexOf('@') === -1) {
     return res.status(400).json({ error: 'Email inválido' });
   }
 
-  const exists = db.customers.find((c) => c.email.toLowerCase() == data.email.toLowerCase());
+  const exists = db.customers.find((c) => c.email.toLowerCase() === data.email.toLowerCase());
   if (exists) {
     return res.status(409).json({ error: 'Email já cadastrado' });
   }
 
   let type = 'regular';
   if (data.type) {
-    if (data.type == 'premium' || data.type == 'regular') {
+    if (data.type === 'premium' || data.type === 'regular') {
       type = data.type;
     } else {
       return res.status(400).json({ msg: 'Tipo de cliente inválido' });
@@ -38,7 +38,7 @@ function create(req, res) {
 function list(req, res) {
   let result = customerRepository.all();
   if (req.query.type) {
-    result = result.filter((c) => c.type == req.query.type);
+    result = result.filter((c) => c.type === req.query.type);
   }
   res.json(result);
 }

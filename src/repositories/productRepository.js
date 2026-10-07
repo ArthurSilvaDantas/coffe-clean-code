@@ -5,7 +5,7 @@ function getProducts() {
 }
 
 function getProduct(id) {
-  return db.products.find((p) => p.id == id);
+  return db.products.find((p) => p.id === Number(id));
 }
 
 function addProduct(product) {

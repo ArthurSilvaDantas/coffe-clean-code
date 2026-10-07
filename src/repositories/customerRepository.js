@@ -7,7 +7,7 @@ function save(customer) {
 }
 
 function findById(id) {
-  return db.customers.find((c) => c.id == id);
+  return db.customers.find((c) => c.id === Number(id));
 }
 
 function findByEmail(email) {

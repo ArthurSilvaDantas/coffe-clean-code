@@ -16,7 +16,7 @@ function calc(list) {
 function isValidCard(n) {
   if (typeof n !== 'string') return false;
   const digits = n.replace(/\s/g, '');
-  return digits.length == 16 && /^\d+$/.test(digits);
+  return digits.length === 16 && /^\d+$/.test(digits);
 }
 
 function maskCard(n) {
