@@ -5,54 +5,119 @@ const orderRepository = require('../repositories/orderRepository');
 const { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS } = require('../constants/businessRules');
 const { ORDER_STATUS, CUSTOMER_TYPE, DELIVERY_TYPE, COUPON_CODE } = require('../constants/domain');
 
+function calculateCustomerDiscount(customer, subtotal) {
+  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
+    return subtotal * DISCOUNT.PREMIUM_RATE;
+  }
+  if (subtotal >= DISCOUNT.REGULAR_MIN_SUBTOTAL) {
+    return subtotal * DISCOUNT.REGULAR_RATE;
+  }
+  return 0;
+}
+
+function calculateCouponDiscount(coupon, subtotal) {
+  if (coupon === COUPON_CODE.CAFE10) {
+    return subtotal * COUPON.CAFE10_DISCOUNT_RATE;
+  }
+  if (coupon === COUPON_CODE.BEMVINDO) {
+    return COUPON.BEMVINDO_FIXED_DISCOUNT;
+  }
+  return 0;
+}
+
+function calculateDiscount(order, customer, subtotal) {
+  const discount =
+    calculateCustomerDiscount(customer, subtotal) + calculateCouponDiscount(order.coupon, subtotal);
+  return Math.min(discount, subtotal * DISCOUNT.MAX_RATE);
+}
+
+function calculateDeliveryFee(order, customer, subtotal) {
+  if (order.deliveryType !== DELIVERY_TYPE.DELIVERY) {
+    return 0;
+  }
+
+  const hasFreeDelivery =
+    customer.type === CUSTOMER_TYPE.PREMIUM ||
+    subtotal >= DELIVERY.FREE_DELIVERY_MIN_SUBTOTAL ||
+    order.coupon === COUPON_CODE.FRETEGRATIS;
+  if (hasFreeDelivery) {
+    return 0;
+  }
+
+  const extraDistance = Math.max(order.distance - DELIVERY.INCLUDED_DISTANCE_KM, 0);
+  return DELIVERY.BASE_FEE + extraDistance * DELIVERY.FEE_PER_EXTRA_KM;
+}
+
 function calculateTotals(order) {
   const subtotal = helpers.calculateSubtotal(order.items);
   const customer = db.customers.find((c) => c.id === order.customerId);
-  let discount = 0;
-
-  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
-    discount = subtotal * DISCOUNT.PREMIUM_RATE;
-  } else {
-    if (subtotal >= DISCOUNT.REGULAR_MIN_SUBTOTAL) {
-      discount = subtotal * DISCOUNT.REGULAR_RATE;
-    }
-  }
-
-  if (order.coupon) {
-    if (order.coupon === COUPON_CODE.CAFE10) {
-      discount = discount + subtotal * COUPON.CAFE10_DISCOUNT_RATE;
-    } else if (order.coupon === COUPON_CODE.BEMVINDO) {
-      discount = discount + COUPON.BEMVINDO_FIXED_DISCOUNT;
-    }
-  }
-
-  if (discount > subtotal * DISCOUNT.MAX_RATE) {
-    discount = subtotal * DISCOUNT.MAX_RATE;
-  }
-
-  let deliveryFee = 0;
-  if (order.deliveryType === DELIVERY_TYPE.DELIVERY) {
-    if (
-      customer.type === CUSTOMER_TYPE.PREMIUM ||
-      subtotal >= DELIVERY.FREE_DELIVERY_MIN_SUBTOTAL ||
-      order.coupon === COUPON_CODE.FRETEGRATIS
-    ) {
-      deliveryFee = 0;
-    } else {
-      deliveryFee = DELIVERY.BASE_FEE;
-      if (order.distance > DELIVERY.INCLUDED_DISTANCE_KM) {
-        deliveryFee =
-          deliveryFee +
-          (order.distance - DELIVERY.INCLUDED_DISTANCE_KM) * DELIVERY.FEE_PER_EXTRA_KM;
-      }
-    }
-  }
+  const discount = calculateDiscount(order, customer, subtotal);
+  const deliveryFee = calculateDeliveryFee(order, customer, subtotal);
 
   order.subtotal = helpers.roundToCents(subtotal);
   order.discount = helpers.roundToCents(discount);
   order.deliveryFee = helpers.roundToCents(deliveryFee);
   order.total = helpers.roundToCents(subtotal - discount + deliveryFee);
   return order;
+}
+
+function validateDelivery(deliveryType, address, distance) {
+  if (deliveryType !== DELIVERY_TYPE.PICKUP && deliveryType !== DELIVERY_TYPE.DELIVERY) {
+    return { error: 'Tipo de entrega inválido', status: 400 };
+  }
+  if (deliveryType === DELIVERY_TYPE.PICKUP) {
+    return null;
+  }
+  if (!address) {
+    return { error: 'Endereço é obrigatório para entrega', status: 400 };
+  }
+  if (distance === undefined || distance <= 0) {
+    return { error: 'Distância inválida', status: 400 };
+  }
+  if (distance > DELIVERY.MAX_DISTANCE_KM) {
+    return { error: 'Endereço fora da área de entrega', status: 400 };
+  }
+  return null;
+}
+
+function isValidItemQuantity(quantity) {
+  return quantity > 0 && quantity <= ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT;
+}
+
+function validateRequestedItems(requestedItems) {
+  for (const requestedItem of requestedItems) {
+    const product = productRepository.findById(requestedItem.productId);
+    if (!product || !product.active) {
+      return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
+    }
+    if (!isValidItemQuantity(requestedItem.quantity)) {
+      return { error: 'Quantidade inválida para o produto ' + product.name, status: 400 };
+    }
+    if (product.stock < requestedItem.quantity) {
+      return { error: 'Estoque insuficiente para ' + product.name, status: 409 };
+    }
+  }
+  return null;
+}
+
+function addRequestedItems(order, requestedItems) {
+  for (const requestedItem of requestedItems) {
+    const product = productRepository.decreaseStock(
+      requestedItem.productId,
+      requestedItem.quantity,
+    );
+    const existingItem = order.items.find((item) => item.productId === product.id);
+    if (existingItem) {
+      existingItem.quantity = existingItem.quantity + requestedItem.quantity;
+    } else {
+      order.items.push({
+        productId: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: requestedItem.quantity,
+      });
+    }
+  }
 }
 
 function createOrder(customerId, deliveryType, distance, address, notes, items) {
@@ -67,21 +132,15 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   }
 
   const selectedDeliveryType = deliveryType || DELIVERY_TYPE.PICKUP;
-  if (
-    selectedDeliveryType !== DELIVERY_TYPE.PICKUP &&
-    selectedDeliveryType !== DELIVERY_TYPE.DELIVERY
-  ) {
-    return { error: 'Tipo de entrega inválido', status: 400 };
+  const deliveryError = validateDelivery(selectedDeliveryType, address, distance);
+  if (deliveryError) {
+    return deliveryError;
   }
-  if (selectedDeliveryType === DELIVERY_TYPE.DELIVERY) {
-    if (!address) {
-      return { error: 'Endereço é obrigatório para entrega', status: 400 };
-    }
-    if (distance === undefined || distance <= 0) {
-      return { error: 'Distância inválida', status: 400 };
-    } else if (distance > DELIVERY.MAX_DISTANCE_KM) {
-      return { error: 'Endereço fora da área de entrega', status: 400 };
-    }
+
+  const requestedItems = items && items.length ? items : [];
+  const itemsError = validateRequestedItems(requestedItems);
+  if (itemsError) {
+    return itemsError;
   }
 
   const order = {
@@ -97,42 +156,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     history: [{ status: ORDER_STATUS.CREATED, at: helpers.now() }],
   };
 
-  if (items && items.length) {
-    for (const requestedItem of items) {
-      const product = productRepository.findById(requestedItem.productId);
-      if (!product || !product.active) {
-        return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
-      }
-      if (
-        !requestedItem.quantity ||
-        requestedItem.quantity <= 0 ||
-        requestedItem.quantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT
-      ) {
-        return { error: 'Quantidade inválida para o produto ' + product.name, status: 400 };
-      }
-      if (product.stock < requestedItem.quantity) {
-        return { error: 'Estoque insuficiente para ' + product.name, status: 409 };
-      }
-    }
-    for (const requestedItem of items) {
-      const product = productRepository.decreaseStock(
-        requestedItem.productId,
-        requestedItem.quantity,
-      );
-      const existingItem = order.items.find((item) => item.productId === product.id);
-      if (existingItem) {
-        existingItem.quantity = existingItem.quantity + requestedItem.quantity;
-      } else {
-        order.items.push({
-          productId: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: requestedItem.quantity,
-        });
-      }
-    }
-  }
-
+  addRequestedItems(order, requestedItems);
   calculateTotals(order);
   orderRepository.save(order);
   return { order };
@@ -153,15 +177,8 @@ function addItem(req, res) {
   const product = db.products.find((p) => p.id === Number(productId));
   if (!product || !product.active) return res.status(404).json({ error: 'Produto não encontrado' });
 
-  let existingItem = null;
-  for (let i = 0; i < order.items.length; i++) {
-    if (order.items[i].productId === product.id) {
-      existingItem = order.items[i];
-    }
-  }
-
-  let totalQuantity = quantity;
-  if (existingItem) totalQuantity = existingItem.quantity + quantity;
+  const existingItem = order.items.find((item) => item.productId === product.id);
+  const totalQuantity = existingItem ? existingItem.quantity + quantity : quantity;
   if (totalQuantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT) {
     return res
       .status(400)

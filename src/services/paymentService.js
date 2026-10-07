@@ -9,115 +9,152 @@ const {
   PAYMENT_METHOD,
 } = require('../constants/domain');
 
+function failure(status, message) {
+  return { ok: false, status, message };
+}
+
+function payWithPix({ total }) {
+  return {
+    ok: true,
+    total: total - total * PAYMENT.PIX_DISCOUNT_RATE,
+    details: { pixKey: PAYMENT.PIX_KEY },
+  };
+}
+
+function calculateInstallmentInterest(total, installments) {
+  if (installments <= PAYMENT.INTEREST_FREE_INSTALLMENTS) {
+    return 0;
+  }
+  return (
+    total *
+    PAYMENT.INTEREST_RATE_PER_EXTRA_INSTALLMENT *
+    (installments - PAYMENT.INTEREST_FREE_INSTALLMENTS)
+  );
+}
+
+function payWithCreditCard({ total, paymentData }) {
+  if (!helpers.isValidCard(paymentData.cardNumber)) {
+    return failure(400, 'Cartão inválido');
+  }
+
+  const installments = paymentData.installments || PAYMENT.MIN_INSTALLMENTS;
+  if (installments < PAYMENT.MIN_INSTALLMENTS || installments > PAYMENT.MAX_INSTALLMENTS) {
+    return failure(400, 'Número de parcelas inválido');
+  }
+
+  const isInstallmentTooSmall =
+    installments > PAYMENT.MIN_INSTALLMENTS && total / installments < PAYMENT.MIN_INSTALLMENT_VALUE;
+  if (isInstallmentTooSmall) {
+    const minInstallmentValue = helpers.formatCurrency(PAYMENT.MIN_INSTALLMENT_VALUE);
+    return failure(400, `O valor mínimo da parcela é ${minInstallmentValue}`);
+  }
+
+  const totalWithInterest = total + calculateInstallmentInterest(total, installments);
+  return {
+    ok: true,
+    total: totalWithInterest,
+    details: {
+      installments,
+      installmentValue: helpers.roundToCents(totalWithInterest / installments),
+      card: helpers.maskCard(paymentData.cardNumber),
+    },
+  };
+}
+
+function payWithDebitCard({ total, paymentData }) {
+  if (!helpers.isValidCard(paymentData.cardNumber)) {
+    return failure(400, 'Cartão inválido');
+  }
+  return { ok: true, total, details: { card: helpers.maskCard(paymentData.cardNumber) } };
+}
+
+function payWithCash({ total, paymentData, order }) {
+  if (paymentData.cashGiven === undefined || paymentData.cashGiven < total) {
+    return failure(400, 'Valor em dinheiro insuficiente');
+  }
+
+  const change = paymentData.cashGiven - total;
+  const isChangeAboveDeliveryLimit =
+    order.deliveryType === DELIVERY_TYPE.DELIVERY && change > PAYMENT.MAX_CHANGE_FOR_DELIVERY;
+  if (isChangeAboveDeliveryLimit) {
+    const maxChange = helpers.formatCurrency(PAYMENT.MAX_CHANGE_FOR_DELIVERY);
+    return failure(400, `Troco máximo para entrega é de ${maxChange}`);
+  }
+
+  return {
+    ok: true,
+    total,
+    details: { cashGiven: paymentData.cashGiven, change: helpers.roundToCents(change) },
+  };
+}
+
+const PAYMENT_HANDLERS = new Map([
+  [PAYMENT_METHOD.PIX, payWithPix],
+  [PAYMENT_METHOD.CREDIT_CARD, payWithCreditCard],
+  [PAYMENT_METHOD.DEBIT_CARD, payWithDebitCard],
+  [PAYMENT_METHOD.CASH, payWithCash],
+]);
+
+function awardLoyaltyPoints(customer, total) {
+  let points = Math.floor(total * LOYALTY.POINTS_PER_REAL);
+  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
+    points = points * LOYALTY.PREMIUM_POINTS_MULTIPLIER;
+  }
+
+  customer.points = customer.points + points;
+  const reachedPremium =
+    customer.type === CUSTOMER_TYPE.REGULAR && customer.points >= LOYALTY.PREMIUM_UPGRADE_POINTS;
+  if (reachedPremium) {
+    customer.type = CUSTOMER_TYPE.PREMIUM;
+  }
+  return points;
+}
+
 function payOrder(orderId, paymentData) {
   const order = orderRepository.findById(orderId);
-  if (!order) return { ok: false, status: 404, message: 'Pedido não encontrado' };
-
-  if (order.status === ORDER_STATUS.CREATED) {
-    if (order.items.length > 0) {
-      const customer = db.customers.find((c) => c.id === order.customerId);
-      let total = order.total;
-      const methodDetails = {};
-
-      if (paymentData.method === PAYMENT_METHOD.PIX) {
-        total = total - total * PAYMENT.PIX_DISCOUNT_RATE;
-        methodDetails.pixKey = PAYMENT.PIX_KEY;
-      } else if (paymentData.method === PAYMENT_METHOD.CREDIT_CARD) {
-        if (!helpers.isValidCard(paymentData.cardNumber)) {
-          return { ok: false, status: 400, message: 'Cartão inválido' };
-        }
-        const installments = paymentData.installments || PAYMENT.MIN_INSTALLMENTS;
-        if (installments < PAYMENT.MIN_INSTALLMENTS || installments > PAYMENT.MAX_INSTALLMENTS) {
-          return { ok: false, status: 400, message: 'Número de parcelas inválido' };
-        } else {
-          if (
-            installments > PAYMENT.MIN_INSTALLMENTS &&
-            total / installments < PAYMENT.MIN_INSTALLMENT_VALUE
-          ) {
-            const minInstallmentValue = helpers.formatCurrency(PAYMENT.MIN_INSTALLMENT_VALUE);
-            return {
-              ok: false,
-              status: 400,
-              message: `O valor mínimo da parcela é ${minInstallmentValue}`,
-            };
-          }
-          if (installments > PAYMENT.INTEREST_FREE_INSTALLMENTS) {
-            total =
-              total +
-              total *
-                PAYMENT.INTEREST_RATE_PER_EXTRA_INSTALLMENT *
-                (installments - PAYMENT.INTEREST_FREE_INSTALLMENTS);
-          }
-        }
-        methodDetails.installments = installments;
-        methodDetails.installmentValue = helpers.roundToCents(total / installments);
-        methodDetails.card = helpers.maskCard(paymentData.cardNumber);
-      } else if (paymentData.method === PAYMENT_METHOD.DEBIT_CARD) {
-        if (!helpers.isValidCard(paymentData.cardNumber)) {
-          return { ok: false, status: 400, message: 'Cartão inválido' };
-        }
-        methodDetails.card = helpers.maskCard(paymentData.cardNumber);
-      } else if (paymentData.method === PAYMENT_METHOD.CASH) {
-        if (paymentData.cashGiven === undefined || paymentData.cashGiven < total) {
-          return { ok: false, status: 400, message: 'Valor em dinheiro insuficiente' };
-        }
-        const change = paymentData.cashGiven - total;
-        if (
-          order.deliveryType === DELIVERY_TYPE.DELIVERY &&
-          change > PAYMENT.MAX_CHANGE_FOR_DELIVERY
-        ) {
-          const maxChange = helpers.formatCurrency(PAYMENT.MAX_CHANGE_FOR_DELIVERY);
-          return {
-            ok: false,
-            status: 400,
-            message: `Troco máximo para entrega é de ${maxChange}`,
-          };
-        }
-        methodDetails.cashGiven = paymentData.cashGiven;
-        methodDetails.change = helpers.roundToCents(change);
-      } else {
-        return { ok: false, status: 400, message: 'Forma de pagamento inválida' };
-      }
-
-      total = helpers.roundToCents(total);
-
-      // pontos de fidelidade
-      let points = Math.floor(total * LOYALTY.POINTS_PER_REAL);
-      if (customer.type === CUSTOMER_TYPE.PREMIUM) {
-        points = points * LOYALTY.PREMIUM_POINTS_MULTIPLIER;
-      }
-      customer.points = customer.points + points;
-      if (
-        customer.type === CUSTOMER_TYPE.REGULAR &&
-        customer.points >= LOYALTY.PREMIUM_UPGRADE_POINTS
-      ) {
-        customer.type = CUSTOMER_TYPE.PREMIUM;
-      }
-
-      const payment = {
-        id: db.counters.payment++,
-        orderId: order.id,
-        method: paymentData.method,
-        total,
-        points: points,
-        ...methodDetails,
-        paidAt: helpers.now(),
-      };
-      db.payments.push(payment);
-
-      order.status = ORDER_STATUS.PAID;
-      order.payment = payment;
-      order.history.push({ status: ORDER_STATUS.PAID, at: payment.paidAt });
-
-      return { ok: true, order };
-    } else {
-      return { ok: false, status: 400, message: 'Pedido sem itens' };
-    }
-  } else if (order.status === ORDER_STATUS.CANCELLED) {
-    return { ok: false, status: 400, message: 'Pedido cancelado' };
-  } else {
-    return { ok: false, status: 409, message: 'Pedido já foi pago' };
+  if (!order) {
+    return failure(404, 'Pedido não encontrado');
   }
+  if (order.status === ORDER_STATUS.CANCELLED) {
+    return failure(400, 'Pedido cancelado');
+  }
+  if (order.status !== ORDER_STATUS.CREATED) {
+    return failure(409, 'Pedido já foi pago');
+  }
+  if (order.items.length === 0) {
+    return failure(400, 'Pedido sem itens');
+  }
+
+  const payWithMethod = PAYMENT_HANDLERS.get(paymentData.method);
+  if (!payWithMethod) {
+    return failure(400, 'Forma de pagamento inválida');
+  }
+
+  const methodResult = payWithMethod({ total: order.total, paymentData, order });
+  if (!methodResult.ok) {
+    return methodResult;
+  }
+
+  const total = helpers.roundToCents(methodResult.total);
+  const customer = db.customers.find((c) => c.id === order.customerId);
+  const points = awardLoyaltyPoints(customer, total);
+
+  const payment = {
+    id: db.counters.payment++,
+    orderId: order.id,
+    method: paymentData.method,
+    total,
+    points,
+    ...methodResult.details,
+    paidAt: helpers.now(),
+  };
+  db.payments.push(payment);
+
+  order.status = ORDER_STATUS.PAID;
+  order.payment = payment;
+  order.history.push({ status: ORDER_STATUS.PAID, at: payment.paidAt });
+
+  return { ok: true, order };
 }
 
 module.exports = { payOrder };
