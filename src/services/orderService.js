@@ -119,7 +119,10 @@ function addRequestedItems(order, requestedItems) {
   }
 }
 
-function createOrder(customerId, deliveryType, distance, address, notes, items) {
+function createOrder({ customerId, deliveryType, distance, address, notes, items }) {
+  if (!customerId) {
+    throw badRequest('customerId é obrigatório');
+  }
   const customer = customerRepository.findById(customerId);
   if (!customer) {
     throw notFound('Cliente não encontrado');
@@ -154,15 +157,40 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   return orderRepository.save(order);
 }
 
-function addItem(req, res) {
-  const order = orderRepository.findById(req.params.id);
-  if (!order) throw notFound('Pedido não encontrado');
+function getOrder(orderId) {
+  const order = orderRepository.findById(orderId);
+  if (!order) {
+    throw notFound('Pedido não encontrado');
+  }
+  return order;
+}
+
+function filterByStatus(orders, status) {
+  return status ? orders.filter((o) => o.status === status.toUpperCase()) : orders;
+}
+
+function listOrders({ status, customerId }) {
+  let orders = filterByStatus(orderRepository.findAll(), status);
+  if (customerId) {
+    orders = orders.filter((o) => o.customerId === Number(customerId));
+  }
+  return orders;
+}
+
+function listCustomerOrders(customerId, { status }) {
+  const customer = customerRepository.findById(customerId);
+  if (!customer) {
+    throw notFound('Cliente não encontrado');
+  }
+  return filterByStatus(orderRepository.findByCustomerId(customer.id), status);
+}
+
+function addItem(orderId, { productId, quantity }) {
+  const order = getOrder(orderId);
   if (order.status !== ORDER_STATUS.CREATED) {
     throw badRequest('Pedido não pode mais ser alterado');
   }
 
-  const productId = req.body.productId;
-  const quantity = req.body.quantity;
   if (!productId) throw badRequest('productId é obrigatório');
   if (!quantity || quantity <= 0) throw badRequest('Quantidade inválida');
 
@@ -181,7 +209,7 @@ function addItem(req, res) {
     throw badRequest('Limite de itens atingido');
   }
 
-  product.stock = product.stock - quantity;
+  productRepository.decreaseStock(product.id, quantity);
 
   if (existingItem) {
     existingItem.quantity = totalQuantity;
@@ -189,15 +217,11 @@ function addItem(req, res) {
     order.items.push({ productId: product.id, name: product.name, price: product.price, quantity });
   }
 
-  calculateTotals(order);
-  res.status(201).json(order);
+  return calculateTotals(order);
 }
 
 function applyCoupon(orderId, code) {
-  const order = orderRepository.findById(orderId);
-  if (!order) {
-    throw notFound('Pedido não encontrado');
-  }
+  const order = getOrder(orderId);
   if (order.status !== ORDER_STATUS.CREATED) {
     throw badRequest('Cupom só pode ser aplicado em pedidos abertos');
   }
@@ -218,4 +242,12 @@ function applyCoupon(orderId, code) {
   return calculateTotals(order);
 }
 
-module.exports = { calculateTotals, createOrder, addItem, applyCoupon };
+module.exports = {
+  calculateTotals,
+  createOrder,
+  getOrder,
+  listOrders,
+  listCustomerOrders,
+  addItem,
+  applyCoupon,
+};
