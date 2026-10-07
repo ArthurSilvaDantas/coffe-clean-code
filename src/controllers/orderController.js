@@ -66,44 +66,43 @@ exports.applyCoupon = (req, res) => {
   }
 };
 
+const NEXT_STATUS = Object.freeze({
+  [ORDER_STATUS.PAID]: ORDER_STATUS.PREPARING,
+  [ORDER_STATUS.PREPARING]: ORDER_STATUS.READY,
+  [ORDER_STATUS.OUT_FOR_DELIVERY]: ORDER_STATUS.DELIVERED,
+});
+
+function getNextStatus(order) {
+  if (order.status !== ORDER_STATUS.READY) {
+    return NEXT_STATUS[order.status];
+  }
+  return order.deliveryType === DELIVERY_TYPE.DELIVERY
+    ? ORDER_STATUS.OUT_FOR_DELIVERY
+    : ORDER_STATUS.DELIVERED;
+}
+
 exports.updateStatus = (req, res) => {
   const order = orderRepository.findById(req.params.id);
-  if (order) {
-    const newStatus = (req.body || {}).status;
-    if (newStatus) {
-      let isValidTransition = false;
-      if (order.status === ORDER_STATUS.PAID) {
-        if (newStatus === ORDER_STATUS.PREPARING) isValidTransition = true;
-      } else if (order.status === ORDER_STATUS.PREPARING) {
-        if (newStatus === ORDER_STATUS.READY) isValidTransition = true;
-      } else if (order.status === ORDER_STATUS.READY) {
-        if (order.deliveryType === DELIVERY_TYPE.DELIVERY) {
-          if (newStatus === ORDER_STATUS.OUT_FOR_DELIVERY) isValidTransition = true;
-        } else {
-          if (newStatus === ORDER_STATUS.DELIVERED) isValidTransition = true;
-        }
-      } else if (order.status === ORDER_STATUS.OUT_FOR_DELIVERY) {
-        if (newStatus === ORDER_STATUS.DELIVERED) isValidTransition = true;
-      }
-
-      if (isValidTransition) {
-        order.status = newStatus;
-        order.history.push({ status: newStatus, at: new Date().toISOString() });
-        if (newStatus === ORDER_STATUS.DELIVERED) {
-          order.deliveredAt = new Date().toISOString();
-        }
-        res.json(order);
-      } else {
-        res
-          .status(400)
-          .json({ error: 'Transição de status inválida: ' + order.status + ' -> ' + newStatus });
-      }
-    } else {
-      res.status(400).json({ error: 'Status é obrigatório' });
-    }
-  } else {
-    res.status(404).json({ error: 'Pedido não encontrado' });
+  if (!order) {
+    return res.status(404).json({ error: 'Pedido não encontrado' });
   }
+
+  const newStatus = (req.body || {}).status;
+  if (!newStatus) {
+    return res.status(400).json({ error: 'Status é obrigatório' });
+  }
+  if (newStatus !== getNextStatus(order)) {
+    return res
+      .status(400)
+      .json({ error: 'Transição de status inválida: ' + order.status + ' -> ' + newStatus });
+  }
+
+  order.status = newStatus;
+  order.history.push({ status: newStatus, at: new Date().toISOString() });
+  if (newStatus === ORDER_STATUS.DELIVERED) {
+    order.deliveredAt = new Date().toISOString();
+  }
+  res.json(order);
 };
 
 exports.cancel = (req, res) => {
