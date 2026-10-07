@@ -31,6 +31,33 @@ npm run format        # Prettier (formata os arquivos)
 npm run format:check  # Prettier (apenas verifica)
 ```
 
+## Organização do código
+
+Cada camada conhece apenas a camada abaixo dela:
+
+```text
+routes → controllers → services → repositories → data
+```
+
+| Pasta              | Responsabilidade                                                                    |
+| ------------------ | ----------------------------------------------------------------------------------- |
+| `src/routes`       | Liga cada rota HTTP ao seu controller.                                              |
+| `src/controllers`  | Lê a requisição, chama o service e envia a resposta. Não contém regras de negócio.  |
+| `src/services`     | Regras de negócio. Não conhece o Express e lança `AppError` quando algo é inválido. |
+| `src/repositories` | Único ponto de acesso aos dados em memória (`src/data`).                            |
+| `src/constants`    | Regras de negócio (`businessRules.js`) e valores fixos do domínio (`domain.js`).    |
+| `src/errors`       | `AppError`, com o status HTTP de cada erro.                                         |
+| `src/middlewares`  | Converte erros em respostas no formato `{ "error": "mensagem" }`.                   |
+| `src/utils`        | Funções genéricas sem regra de negócio: dinheiro, cartão e data.                    |
+
+Services do domínio de pedidos:
+
+- `orderService`: criação, consulta, itens e cupons
+- `orderStatusService`: transições de status e cancelamento
+- `pricingService`: subtotal, descontos, taxa de entrega e total
+- `paymentService` e `paymentMethods`: fluxo do pagamento e cada forma de pagamento
+- `loyaltyService`: pontos de fidelidade
+
 ## Glossário do domínio
 
 Termos usados de forma única no código, na API e nos testes.
