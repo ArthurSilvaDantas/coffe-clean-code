@@ -8,7 +8,7 @@ function round(n) {
 function calc(list) {
   let t = 0;
   for (let i = 0; i < list.length; i++) {
-    t = t + list[i].value * list[i].qty;
+    t = t + list[i].price * list[i].quantity;
   }
   return round(t);
 }
@@ -23,8 +23,8 @@ function maskCard(n) {
   return '**** **** **** ' + n.replace(/\s/g, '').slice(-4);
 }
 
-function isPremium(client) {
-  return client.type === 'premium';
+function isPremium(customer) {
+  return customer.type === 'premium';
 }
 
 function now() {

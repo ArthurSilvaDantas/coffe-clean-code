@@ -21,7 +21,7 @@ describe('Criação de pedidos', () => {
       subtotal: 24.8,
       discount: 0,
       deliveryFee: 0,
-      amount: 24.8,
+      total: 24.8,
     });
 
     const products = await request(app).get('/products');
@@ -35,7 +35,7 @@ describe('Criação de pedidos', () => {
       items: [{ productId: 3, quantity: 10 }],
     });
 
-    expect(res.body).toMatchObject({ subtotal: 105, discount: 5.25, amount: 99.75 });
+    expect(res.body).toMatchObject({ subtotal: 105, discount: 5.25, total: 99.75 });
   });
 
   test('cliente premium recebe 10% de desconto', async () => {
@@ -45,7 +45,7 @@ describe('Criação de pedidos', () => {
       items: [{ productId: 3, quantity: 2 }],
     });
 
-    expect(res.body).toMatchObject({ subtotal: 21, discount: 2.1, amount: 18.9 });
+    expect(res.body).toMatchObject({ subtotal: 21, discount: 2.1, total: 18.9 });
   });
 
   test('cobra taxa de entrega com adicional por distância', async () => {
@@ -65,8 +65,8 @@ describe('Criação de pedidos', () => {
       items: [{ productId: 1, quantity: 1 }],
     });
 
-    expect(near.body).toMatchObject({ deliveryFee: 7, amount: 13.5 });
-    expect(far.body).toMatchObject({ deliveryFee: 10, amount: 16.5 });
+    expect(near.body).toMatchObject({ deliveryFee: 7, total: 13.5 });
+    expect(far.body).toMatchObject({ deliveryFee: 10, total: 16.5 });
   });
 
   test('entrega grátis para pedidos a partir de R$ 50 e para clientes premium', async () => {
@@ -87,7 +87,7 @@ describe('Criação de pedidos', () => {
       items: [{ productId: 1, quantity: 1 }],
     });
 
-    expect(big.body).toMatchObject({ deliveryFee: 0, amount: 52.5 });
+    expect(big.body).toMatchObject({ deliveryFee: 0, total: 52.5 });
     expect(premiumOrder.body.deliveryFee).toBe(0);
   });
 
@@ -150,8 +150,8 @@ describe('Itens do pedido', () => {
       .send({ productId: 5, quantity: 1 });
 
     expect(res.status).toBe(201);
-    expect(res.body.items).toEqual([{ productId: 5, name: 'Croissant', value: 8, qty: 3 }]);
-    expect(res.body.amount).toBe(24);
+    expect(res.body.items).toEqual([{ productId: 5, name: 'Croissant', price: 8, quantity: 3 }]);
+    expect(res.body.total).toBe(24);
   });
 
   test('não permite mais de 10 unidades do mesmo produto', async () => {
@@ -200,8 +200,8 @@ describe('Cupons', () => {
       .post(`/orders/${premiumOrder.id}/coupon`)
       .send({ code: 'CAFE10' });
 
-    expect(r1.body).toMatchObject({ coupon: 'CAFE10', discount: 2.1, amount: 18.9 });
-    expect(r2.body).toMatchObject({ discount: 4.2, amount: 16.8 });
+    expect(r1.body).toMatchObject({ coupon: 'CAFE10', discount: 2.1, total: 18.9 });
+    expect(r2.body).toMatchObject({ discount: 4.2, total: 16.8 });
   });
 
   test('desconto total é limitado a 30% do subtotal', async () => {
@@ -211,7 +211,7 @@ describe('Cupons', () => {
     ).body;
     const res = await request(app).post(`/orders/${order.id}/coupon`).send({ code: 'BEMVINDO' });
 
-    expect(res.body).toMatchObject({ subtotal: 6.5, discount: 1.95, amount: 4.55 });
+    expect(res.body).toMatchObject({ subtotal: 6.5, discount: 1.95, total: 4.55 });
   });
 
   test('FRETEGRATIS remove a taxa de entrega e exige pedido com entrega', async () => {
@@ -236,7 +236,7 @@ describe('Cupons', () => {
       .post(`/orders/${pickup.id}/coupon`)
       .send({ code: 'FRETEGRATIS' });
 
-    expect(ok.body).toMatchObject({ deliveryFee: 0, amount: 6.5 });
+    expect(ok.body).toMatchObject({ deliveryFee: 0, total: 6.5 });
     expect(fail.status).toBe(400);
   });
 

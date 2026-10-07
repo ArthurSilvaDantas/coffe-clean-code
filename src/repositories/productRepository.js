@@ -14,9 +14,9 @@ function addProduct(product) {
   return product;
 }
 
-function decreaseStock(id, qty) {
+function decreaseStock(id, quantity) {
   const product = getProduct(id);
-  product.stock = product.stock - qty;
+  product.stock = product.stock - quantity;
   return product;
 }
 

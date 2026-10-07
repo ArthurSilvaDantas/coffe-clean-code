@@ -9,7 +9,7 @@ const router = express.Router();
 router.post('/customers', customerController.create);
 router.get('/customers', customerController.list);
 router.get('/customers/:id', customerController.get);
-router.get('/customers/:id/orders', orderController.listByClient);
+router.get('/customers/:id/orders', orderController.listByCustomer);
 
 router.post('/products', productController.create);
 router.get('/products', productController.list);
