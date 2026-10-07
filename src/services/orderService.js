@@ -2,40 +2,48 @@ const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const productRepository = require('../repositories/productRepository');
 const orderRepository = require('../repositories/orderRepository');
+const { DISCOUNT, COUPON, DELIVERY, ORDER_LIMITS } = require('../constants/businessRules');
+const { ORDER_STATUS, CUSTOMER_TYPE, DELIVERY_TYPE, COUPON_CODE } = require('../constants/domain');
 
 function calculateTotals(order) {
   const subtotal = helpers.calculateSubtotal(order.items);
   const customer = db.customers.find((c) => c.id === order.customerId);
   let discount = 0;
 
-  if (customer.type === 'premium') {
-    discount = subtotal * 0.1;
+  if (customer.type === CUSTOMER_TYPE.PREMIUM) {
+    discount = subtotal * DISCOUNT.PREMIUM_RATE;
   } else {
-    if (subtotal >= 100) {
-      discount = subtotal * 0.05;
+    if (subtotal >= DISCOUNT.REGULAR_MIN_SUBTOTAL) {
+      discount = subtotal * DISCOUNT.REGULAR_RATE;
     }
   }
 
   if (order.coupon) {
-    if (order.coupon === 'CAFE10') {
-      discount = discount + subtotal * 0.1;
-    } else if (order.coupon === 'BEMVINDO') {
-      discount = discount + 5;
+    if (order.coupon === COUPON_CODE.CAFE10) {
+      discount = discount + subtotal * COUPON.CAFE10_DISCOUNT_RATE;
+    } else if (order.coupon === COUPON_CODE.BEMVINDO) {
+      discount = discount + COUPON.BEMVINDO_FIXED_DISCOUNT;
     }
   }
 
-  if (discount > subtotal * 0.3) {
-    discount = subtotal * 0.3;
+  if (discount > subtotal * DISCOUNT.MAX_RATE) {
+    discount = subtotal * DISCOUNT.MAX_RATE;
   }
 
   let deliveryFee = 0;
-  if (order.deliveryType === 'delivery') {
-    if (customer.type === 'premium' || subtotal >= 50 || order.coupon === 'FRETEGRATIS') {
+  if (order.deliveryType === DELIVERY_TYPE.DELIVERY) {
+    if (
+      customer.type === CUSTOMER_TYPE.PREMIUM ||
+      subtotal >= DELIVERY.FREE_DELIVERY_MIN_SUBTOTAL ||
+      order.coupon === COUPON_CODE.FRETEGRATIS
+    ) {
       deliveryFee = 0;
     } else {
-      deliveryFee = 7;
-      if (order.distance > 3) {
-        deliveryFee = deliveryFee + (order.distance - 3) * 1.5;
+      deliveryFee = DELIVERY.BASE_FEE;
+      if (order.distance > DELIVERY.INCLUDED_DISTANCE_KM) {
+        deliveryFee =
+          deliveryFee +
+          (order.distance - DELIVERY.INCLUDED_DISTANCE_KM) * DELIVERY.FEE_PER_EXTRA_KM;
       }
     }
   }
@@ -52,21 +60,26 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
   if (!customer) {
     return { error: 'Cliente não encontrado', status: 404 };
   }
-  if (orderRepository.countOpenByCustomer(customer.id) >= 3) {
+  if (
+    orderRepository.countOpenByCustomer(customer.id) >= ORDER_LIMITS.MAX_OPEN_ORDERS_PER_CUSTOMER
+  ) {
     return { error: 'Cliente possui muitos pedidos em aberto', status: 409 };
   }
 
-  const selectedDeliveryType = deliveryType || 'pickup';
-  if (selectedDeliveryType !== 'pickup' && selectedDeliveryType !== 'delivery') {
+  const selectedDeliveryType = deliveryType || DELIVERY_TYPE.PICKUP;
+  if (
+    selectedDeliveryType !== DELIVERY_TYPE.PICKUP &&
+    selectedDeliveryType !== DELIVERY_TYPE.DELIVERY
+  ) {
     return { error: 'Tipo de entrega inválido', status: 400 };
   }
-  if (selectedDeliveryType === 'delivery') {
+  if (selectedDeliveryType === DELIVERY_TYPE.DELIVERY) {
     if (!address) {
       return { error: 'Endereço é obrigatório para entrega', status: 400 };
     }
     if (distance === undefined || distance <= 0) {
       return { error: 'Distância inválida', status: 400 };
-    } else if (distance > 10) {
+    } else if (distance > DELIVERY.MAX_DISTANCE_KM) {
       return { error: 'Endereço fora da área de entrega', status: 400 };
     }
   }
@@ -75,13 +88,13 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
     customerId: customer.id,
     items: [],
     deliveryType: selectedDeliveryType,
-    distance: selectedDeliveryType === 'delivery' ? distance : 0,
+    distance: selectedDeliveryType === DELIVERY_TYPE.DELIVERY ? distance : 0,
     address: address || null,
     notes: notes || '',
     coupon: null,
-    status: 'CREATED',
+    status: ORDER_STATUS.CREATED,
     createdAt: helpers.now(),
-    history: [{ status: 'CREATED', at: helpers.now() }],
+    history: [{ status: ORDER_STATUS.CREATED, at: helpers.now() }],
   };
 
   if (items && items.length) {
@@ -90,7 +103,11 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
       if (!product || !product.active) {
         return { error: 'Produto ' + requestedItem.productId + ' não encontrado', status: 404 };
       }
-      if (!requestedItem.quantity || requestedItem.quantity <= 0 || requestedItem.quantity > 10) {
+      if (
+        !requestedItem.quantity ||
+        requestedItem.quantity <= 0 ||
+        requestedItem.quantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT
+      ) {
         return { error: 'Quantidade inválida para o produto ' + product.name, status: 400 };
       }
       if (product.stock < requestedItem.quantity) {
@@ -124,7 +141,7 @@ function createOrder(customerId, deliveryType, distance, address, notes, items) 
 function addItem(req, res) {
   const order = orderRepository.findById(req.params.id);
   if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
-  if (order.status !== 'CREATED') {
+  if (order.status !== ORDER_STATUS.CREATED) {
     return res.status(400).json({ error: 'Pedido não pode mais ser alterado' });
   }
 
@@ -145,13 +162,15 @@ function addItem(req, res) {
 
   let totalQuantity = quantity;
   if (existingItem) totalQuantity = existingItem.quantity + quantity;
-  if (totalQuantity > 10) {
-    return res.status(400).json({ error: 'Máximo de 10 unidades por produto' });
+  if (totalQuantity > ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT) {
+    return res
+      .status(400)
+      .json({ error: `Máximo de ${ORDER_LIMITS.MAX_QUANTITY_PER_PRODUCT} unidades por produto` });
   }
   if (product.stock < quantity) {
     return res.status(409).json({ error: 'Estoque insuficiente para ' + product.name });
   }
-  if (!existingItem && order.items.length >= 15) {
+  if (!existingItem && order.items.length >= ORDER_LIMITS.MAX_DISTINCT_ITEMS) {
     return res.status(400).json({ error: 'Limite de itens atingido' });
   }
 
@@ -174,25 +193,25 @@ function applyCoupon(orderId, code) {
     err.status = 404;
     throw err;
   }
-  if (order.status !== 'CREATED') {
+  if (order.status !== ORDER_STATUS.CREATED) {
     const err = new Error('Cupom só pode ser aplicado em pedidos abertos');
     err.status = 400;
     throw err;
   }
 
   const couponCode = (code || '').toUpperCase().trim();
-  const validCoupons = ['CAFE10', 'BEMVINDO', 'FRETEGRATIS'];
+  const validCoupons = [COUPON_CODE.CAFE10, COUPON_CODE.BEMVINDO, COUPON_CODE.FRETEGRATIS];
   if (validCoupons.indexOf(couponCode) === -1) {
     const err = new Error('Cupom inválido');
     err.status = 400;
     throw err;
   }
-  if (couponCode === 'BEMVINDO' && orderRepository.hasPaidOrders(order.customerId)) {
+  if (couponCode === COUPON_CODE.BEMVINDO && orderRepository.hasPaidOrders(order.customerId)) {
     const err = new Error('Cupom válido apenas para a primeira compra');
     err.status = 400;
     throw err;
   }
-  if (couponCode === 'FRETEGRATIS' && order.deliveryType !== 'delivery') {
+  if (couponCode === COUPON_CODE.FRETEGRATIS && order.deliveryType !== DELIVERY_TYPE.DELIVERY) {
     const err = new Error('Cupom válido apenas para pedidos com entrega');
     err.status = 400;
     throw err;

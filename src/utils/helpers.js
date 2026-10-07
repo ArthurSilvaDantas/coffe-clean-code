@@ -1,3 +1,6 @@
+const { CARD } = require('../constants/businessRules');
+const { CUSTOMER_TYPE } = require('../constants/domain');
+
 function roundToCents(value) {
   return Math.round(value * 100) / 100;
 }
@@ -13,15 +16,19 @@ function calculateSubtotal(items) {
 function isValidCard(cardNumber) {
   if (typeof cardNumber !== 'string') return false;
   const digits = cardNumber.replace(/\s/g, '');
-  return digits.length === 16 && /^\d+$/.test(digits);
+  return digits.length === CARD.NUMBER_LENGTH && /^\d+$/.test(digits);
 }
 
 function maskCard(cardNumber) {
-  return '**** **** **** ' + cardNumber.replace(/\s/g, '').slice(-4);
+  return '**** **** **** ' + cardNumber.replace(/\s/g, '').slice(-CARD.VISIBLE_DIGITS);
+}
+
+function formatCurrency(value) {
+  return 'R$ ' + value.toFixed(2).replace('.', ',');
 }
 
 function isPremium(customer) {
-  return customer.type === 'premium';
+  return customer.type === CUSTOMER_TYPE.PREMIUM;
 }
 
 function now() {
@@ -32,4 +39,13 @@ function fail(res, status, message) {
   return res.status(status).json({ error: message });
 }
 
-module.exports = { roundToCents, calculateSubtotal, isValidCard, maskCard, isPremium, now, fail };
+module.exports = {
+  roundToCents,
+  calculateSubtotal,
+  isValidCard,
+  maskCard,
+  formatCurrency,
+  isPremium,
+  now,
+  fail,
+};
