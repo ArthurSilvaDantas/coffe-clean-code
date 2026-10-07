@@ -2,6 +2,7 @@ const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
 const { PAYMENT, LOYALTY } = require('../constants/businessRules');
+const { badRequest, conflict, notFound } = require('../errors/AppError');
 const {
   ORDER_STATUS,
   CUSTOMER_TYPE,
@@ -9,13 +10,8 @@ const {
   PAYMENT_METHOD,
 } = require('../constants/domain');
 
-function failure(status, message) {
-  return { ok: false, status, message };
-}
-
 function payWithPix({ total }) {
   return {
-    ok: true,
     total: total - total * PAYMENT.PIX_DISCOUNT_RATE,
     details: { pixKey: PAYMENT.PIX_KEY },
   };
@@ -34,24 +30,23 @@ function calculateInstallmentInterest(total, installments) {
 
 function payWithCreditCard({ total, paymentData }) {
   if (!helpers.isValidCard(paymentData.cardNumber)) {
-    return failure(400, 'Cartão inválido');
+    throw badRequest('Cartão inválido');
   }
 
   const installments = paymentData.installments || PAYMENT.MIN_INSTALLMENTS;
   if (installments < PAYMENT.MIN_INSTALLMENTS || installments > PAYMENT.MAX_INSTALLMENTS) {
-    return failure(400, 'Número de parcelas inválido');
+    throw badRequest('Número de parcelas inválido');
   }
 
   const isInstallmentTooSmall =
     installments > PAYMENT.MIN_INSTALLMENTS && total / installments < PAYMENT.MIN_INSTALLMENT_VALUE;
   if (isInstallmentTooSmall) {
     const minInstallmentValue = helpers.formatCurrency(PAYMENT.MIN_INSTALLMENT_VALUE);
-    return failure(400, `O valor mínimo da parcela é ${minInstallmentValue}`);
+    throw badRequest(`O valor mínimo da parcela é ${minInstallmentValue}`);
   }
 
   const totalWithInterest = total + calculateInstallmentInterest(total, installments);
   return {
-    ok: true,
     total: totalWithInterest,
     details: {
       installments,
@@ -63,14 +58,14 @@ function payWithCreditCard({ total, paymentData }) {
 
 function payWithDebitCard({ total, paymentData }) {
   if (!helpers.isValidCard(paymentData.cardNumber)) {
-    return failure(400, 'Cartão inválido');
+    throw badRequest('Cartão inválido');
   }
-  return { ok: true, total, details: { card: helpers.maskCard(paymentData.cardNumber) } };
+  return { total, details: { card: helpers.maskCard(paymentData.cardNumber) } };
 }
 
 function payWithCash({ total, paymentData, order }) {
   if (paymentData.cashGiven === undefined || paymentData.cashGiven < total) {
-    return failure(400, 'Valor em dinheiro insuficiente');
+    throw badRequest('Valor em dinheiro insuficiente');
   }
 
   const change = paymentData.cashGiven - total;
@@ -78,11 +73,10 @@ function payWithCash({ total, paymentData, order }) {
     order.deliveryType === DELIVERY_TYPE.DELIVERY && change > PAYMENT.MAX_CHANGE_FOR_DELIVERY;
   if (isChangeAboveDeliveryLimit) {
     const maxChange = helpers.formatCurrency(PAYMENT.MAX_CHANGE_FOR_DELIVERY);
-    return failure(400, `Troco máximo para entrega é de ${maxChange}`);
+    throw badRequest(`Troco máximo para entrega é de ${maxChange}`);
   }
 
   return {
-    ok: true,
     total,
     details: { cashGiven: paymentData.cashGiven, change: helpers.roundToCents(change) },
   };
@@ -113,27 +107,24 @@ function awardLoyaltyPoints(customer, total) {
 function payOrder(orderId, paymentData) {
   const order = orderRepository.findById(orderId);
   if (!order) {
-    return failure(404, 'Pedido não encontrado');
+    throw notFound('Pedido não encontrado');
   }
   if (order.status === ORDER_STATUS.CANCELLED) {
-    return failure(400, 'Pedido cancelado');
+    throw badRequest('Pedido cancelado');
   }
   if (order.status !== ORDER_STATUS.CREATED) {
-    return failure(409, 'Pedido já foi pago');
+    throw conflict('Pedido já foi pago');
   }
   if (order.items.length === 0) {
-    return failure(400, 'Pedido sem itens');
+    throw badRequest('Pedido sem itens');
   }
 
   const payWithMethod = PAYMENT_HANDLERS.get(paymentData.method);
   if (!payWithMethod) {
-    return failure(400, 'Forma de pagamento inválida');
+    throw badRequest('Forma de pagamento inválida');
   }
 
   const methodResult = payWithMethod({ total: order.total, paymentData, order });
-  if (!methodResult.ok) {
-    return methodResult;
-  }
 
   const total = helpers.roundToCents(methodResult.total);
   const customer = db.customers.find((c) => c.id === order.customerId);
@@ -154,7 +145,7 @@ function payOrder(orderId, paymentData) {
   order.payment = payment;
   order.history.push({ status: ORDER_STATUS.PAID, at: payment.paidAt });
 
-  return { ok: true, order };
+  return order;
 }
 
 module.exports = { payOrder };

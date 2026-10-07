@@ -2,15 +2,16 @@ const { db } = require('../data/db');
 const productRepository = require('../repositories/productRepository');
 const { PRODUCT_RULES } = require('../constants/businessRules');
 const { PRODUCT_CATEGORY } = require('../constants/domain');
+const { badRequest, notFound } = require('../errors/AppError');
 
 exports.create = (req, res) => {
   const { name, price, stock, category } = req.body || {};
-  if (!name || name.trim() === '') return res.status(400).json({ error: 'Nome é obrigatório' });
+  if (!name || name.trim() === '') throw badRequest('Nome é obrigatório');
   if (typeof price !== 'number' || price <= 0) {
-    return res.status(400).json({ error: 'Preço inválido' });
+    throw badRequest('Preço inválido');
   }
   if (price > PRODUCT_RULES.MAX_PRICE) {
-    return res.status(400).json({ error: 'Preço acima do permitido' });
+    throw badRequest('Preço acima do permitido');
   }
 
   const initialStock = stock === undefined ? 0 : stock;
@@ -19,7 +20,7 @@ exports.create = (req, res) => {
     initialStock < 0 ||
     initialStock > PRODUCT_RULES.MAX_STOCK
   ) {
-    return res.status(400).json({ message: 'Estoque inválido' });
+    throw badRequest('Estoque inválido');
   }
 
   const selectedCategory = category || PRODUCT_CATEGORY.COFFEE;
@@ -28,7 +29,7 @@ exports.create = (req, res) => {
     selectedCategory !== PRODUCT_CATEGORY.FOOD &&
     selectedCategory !== PRODUCT_CATEGORY.DRINK
   ) {
-    return res.status(400).json({ message: 'Categoria inválida' });
+    throw badRequest('Categoria inválida');
   }
 
   const product = productRepository.save({
@@ -54,17 +55,17 @@ exports.list = (req, res) => {
 
 exports.updateStock = (req, res) => {
   const product = db.products.find((p) => p.id === Number(req.params.id));
-  if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
+  if (!product) throw notFound('Produto não encontrado');
 
   const stockChange = (req.body || {}).quantity;
   if (typeof stockChange !== 'number') {
-    return res.status(400).json({ error: 'Quantidade inválida' });
+    throw badRequest('Quantidade inválida');
   }
   if (product.stock + stockChange < 0) {
-    return res.status(400).json({ error: 'Estoque não pode ficar negativo' });
+    throw badRequest('Estoque não pode ficar negativo');
   }
   if (product.stock + stockChange > PRODUCT_RULES.MAX_STOCK) {
-    return res.status(400).json({ error: 'Estoque máximo excedido' });
+    throw badRequest('Estoque máximo excedido');
   }
 
   product.stock = product.stock + stockChange;

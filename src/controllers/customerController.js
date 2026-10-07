@@ -2,26 +2,27 @@ const customerRepository = require('../repositories/customerRepository');
 const { db } = require('../data/db');
 const { CUSTOMER_RULES } = require('../constants/businessRules');
 const { CUSTOMER_TYPE } = require('../constants/domain');
+const { badRequest, conflict, notFound } = require('../errors/AppError');
 
 function create(req, res) {
   const customerData = req.body || {};
   if (!customerData.name || customerData.name.trim().length < CUSTOMER_RULES.MIN_NAME_LENGTH) {
-    return res.status(400).json({ error: 'Nome inválido' });
+    throw badRequest('Nome inválido');
   }
   if (!customerData.email || customerData.email.indexOf('@') === -1) {
-    return res.status(400).json({ error: 'Email inválido' });
+    throw badRequest('Email inválido');
   }
 
   const existingCustomer = db.customers.find(
     (c) => c.email.toLowerCase() === customerData.email.toLowerCase(),
   );
   if (existingCustomer) {
-    return res.status(409).json({ error: 'Email já cadastrado' });
+    throw conflict('Email já cadastrado');
   }
 
   const customerType = customerData.type || CUSTOMER_TYPE.REGULAR;
   if (customerType !== CUSTOMER_TYPE.PREMIUM && customerType !== CUSTOMER_TYPE.REGULAR) {
-    return res.status(400).json({ msg: 'Tipo de cliente inválido' });
+    throw badRequest('Tipo de cliente inválido');
   }
 
   const customer = customerRepository.save({
@@ -46,7 +47,7 @@ function list(req, res) {
 function get(req, res) {
   const customer = customerRepository.findById(req.params.id);
   if (!customer) {
-    return res.status(404).json({ error: 'Cliente não encontrado' });
+    throw notFound('Cliente não encontrado');
   }
   res.json(customer);
 }

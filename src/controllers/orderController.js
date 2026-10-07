@@ -4,13 +4,14 @@ const orderRepository = require('../repositories/orderRepository');
 const helpers = require('../utils/helpers');
 const { CANCELLATION } = require('../constants/businessRules');
 const { ORDER_STATUS, DELIVERY_TYPE } = require('../constants/domain');
+const { badRequest, notFound } = require('../errors/AppError');
 
 exports.create = (req, res) => {
   const body = req.body || {};
   if (!body.customerId) {
-    return res.status(400).json({ error: 'customerId é obrigatório' });
+    throw badRequest('customerId é obrigatório');
   }
-  const result = orderService.createOrder(
+  const order = orderService.createOrder(
     body.customerId,
     body.deliveryType,
     body.distance,
@@ -18,10 +19,7 @@ exports.create = (req, res) => {
     body.notes,
     body.items,
   );
-  if (result.error) {
-    return res.status(result.status).json({ error: result.error });
-  }
-  res.status(201).json(result.order);
+  res.status(201).json(order);
 };
 
 exports.list = (req, res) => {
@@ -38,7 +36,7 @@ exports.list = (req, res) => {
 exports.listByCustomer = (req, res) => {
   const customer = db.customers.find((c) => c.id === Number(req.params.id));
   if (!customer) {
-    return res.status(404).json({ error: 'Cliente não encontrado' });
+    throw notFound('Cliente não encontrado');
   }
   let orders = db.orders.filter((o) => o.customerId === customer.id);
   if (req.query.status) {
@@ -49,7 +47,7 @@ exports.listByCustomer = (req, res) => {
 
 exports.get = (req, res) => {
   const order = orderRepository.findById(req.params.id);
-  if (!order) return res.status(404).json({ error: 'Pedido não encontrado' });
+  if (!order) throw notFound('Pedido não encontrado');
   res.json(order);
 };
 
@@ -58,12 +56,8 @@ exports.addItem = (req, res) => {
 };
 
 exports.applyCoupon = (req, res) => {
-  try {
-    const order = orderService.applyCoupon(req.params.id, (req.body || {}).code);
-    res.json(order);
-  } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
-  }
+  const order = orderService.applyCoupon(req.params.id, (req.body || {}).code);
+  res.json(order);
 };
 
 const NEXT_STATUS = Object.freeze({
@@ -84,17 +78,15 @@ function getNextStatus(order) {
 exports.updateStatus = (req, res) => {
   const order = orderRepository.findById(req.params.id);
   if (!order) {
-    return res.status(404).json({ error: 'Pedido não encontrado' });
+    throw notFound('Pedido não encontrado');
   }
 
   const newStatus = (req.body || {}).status;
   if (!newStatus) {
-    return res.status(400).json({ error: 'Status é obrigatório' });
+    throw badRequest('Status é obrigatório');
   }
   if (newStatus !== getNextStatus(order)) {
-    return res
-      .status(400)
-      .json({ error: 'Transição de status inválida: ' + order.status + ' -> ' + newStatus });
+    throw badRequest('Transição de status inválida: ' + order.status + ' -> ' + newStatus);
   }
 
   order.status = newStatus;
@@ -136,16 +128,16 @@ function reverseLoyaltyPoints(order) {
 exports.cancel = (req, res) => {
   const order = orderRepository.findById(req.params.id);
   if (!order) {
-    return res.status(404).json({ error: 'Pedido não encontrado' });
+    throw notFound('Pedido não encontrado');
   }
   if (!CANCELLABLE_STATUSES.includes(order.status)) {
-    return res.status(400).json({ message: 'Pedido não pode mais ser cancelado' });
+    throw badRequest('Pedido não pode mais ser cancelado');
   }
 
   const reason = (req.body || {}).reason;
   const wasPaid = order.status !== ORDER_STATUS.CREATED;
   if (wasPaid && !reason) {
-    return res.status(400).json({ message: 'Informe o motivo do cancelamento' });
+    throw badRequest('Informe o motivo do cancelamento');
   }
 
   const refund = helpers.roundToCents(calculateRefund(order));

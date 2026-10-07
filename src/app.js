@@ -1,5 +1,6 @@
 const express = require('express');
 const routes = require('./routes');
+const { notFoundHandler, errorHandler } = require('./middlewares/errorHandler');
 
 const app = express();
 
@@ -18,16 +19,7 @@ app.get('/health', (req, res) => {
 
 app.use(routes);
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Rota não encontrada' });
-});
-
-app.use((err, req, res, _next) => {
-  if (err.type === 'entity.parse.failed') {
-    return res.status(400).json({ error: 'JSON inválido' });
-  }
-  console.error(err);
-  res.status(500).json({ message: 'Erro interno do servidor' });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 module.exports = app;
