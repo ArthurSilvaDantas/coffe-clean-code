@@ -1,23 +1,23 @@
 const { db } = require('../data/db');
 
-function getProducts() {
+function findAll() {
   return db.products;
 }
 
-function getProduct(id) {
+function findById(id) {
   return db.products.find((p) => p.id === Number(id));
 }
 
-function addProduct(product) {
+function save(product) {
   product.id = db.counters.product++;
   db.products.push(product);
   return product;
 }
 
 function decreaseStock(id, quantity) {
-  const product = getProduct(id);
+  const product = findById(id);
   product.stock = product.stock - quantity;
   return product;
 }
 
-module.exports = { getProducts, getProduct, addProduct, decreaseStock };
+module.exports = { findAll, findById, save, decreaseStock };

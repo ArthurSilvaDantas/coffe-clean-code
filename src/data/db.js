@@ -8,7 +8,6 @@ const db = {
   counters: {},
 };
 
-// reinicia o banco
 function reset() {
   db.customers = [];
   db.products = JSON.parse(JSON.stringify(initialProducts));

@@ -9,47 +9,57 @@ exports.create = (req, res) => {
   }
   if (price > 500) return res.status(400).json({ error: 'Preço acima do permitido' });
 
-  let s = stock;
-  if (s === undefined) s = 0;
-  if (typeof s !== 'number' || s < 0 || s > 200) {
+  let initialStock = stock;
+  if (initialStock === undefined) initialStock = 0;
+  if (typeof initialStock !== 'number' || initialStock < 0 || initialStock > 200) {
     return res.status(400).json({ message: 'Estoque inválido' });
   }
 
-  const cat = category || 'coffee';
-  if (cat !== 'coffee' && cat !== 'food' && cat !== 'drink') {
+  const selectedCategory = category || 'coffee';
+  if (
+    selectedCategory !== 'coffee' &&
+    selectedCategory !== 'food' &&
+    selectedCategory !== 'drink'
+  ) {
     return res.status(400).json({ message: 'Categoria inválida' });
   }
 
-  const p = productRepository.addProduct({
+  const product = productRepository.save({
     name: name.trim(),
     price,
-    stock: s,
-    category: cat,
+    stock: initialStock,
+    category: selectedCategory,
     active: true,
   });
-  res.status(201).json(p);
+  res.status(201).json(product);
 };
 
 exports.list = (req, res) => {
-  let result = db.products.filter((p) => p.active);
+  let products = db.products.filter((p) => p.active);
   if (req.query.category) {
-    result = result.filter((p) => p.category === req.query.category);
+    products = products.filter((p) => p.category === req.query.category);
   }
   if (req.query.available === 'true') {
-    result = result.filter((p) => p.stock > 0);
+    products = products.filter((p) => p.stock > 0);
   }
-  res.json(result);
+  res.json(products);
 };
 
 exports.updateStock = (req, res) => {
-  const p = db.products.find((x) => x.id === Number(req.params.id));
-  if (!p) return res.status(404).json({ error: 'Produto não encontrado' });
+  const product = db.products.find((p) => p.id === Number(req.params.id));
+  if (!product) return res.status(404).json({ error: 'Produto não encontrado' });
 
-  const val = (req.body || {}).quantity;
-  if (typeof val !== 'number') return res.status(400).json({ error: 'Quantidade inválida' });
-  if (p.stock + val < 0) return res.status(400).json({ error: 'Estoque não pode ficar negativo' });
-  if (p.stock + val > 200) return res.status(400).json({ error: 'Estoque máximo excedido' });
+  const stockChange = (req.body || {}).quantity;
+  if (typeof stockChange !== 'number') {
+    return res.status(400).json({ error: 'Quantidade inválida' });
+  }
+  if (product.stock + stockChange < 0) {
+    return res.status(400).json({ error: 'Estoque não pode ficar negativo' });
+  }
+  if (product.stock + stockChange > 200) {
+    return res.status(400).json({ error: 'Estoque máximo excedido' });
+  }
 
-  p.stock = p.stock + val;
-  res.json(p);
+  product.stock = product.stock + stockChange;
+  res.json(product);
 };

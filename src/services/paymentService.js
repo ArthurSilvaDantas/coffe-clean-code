@@ -2,57 +2,57 @@ const { db } = require('../data/db');
 const helpers = require('../utils/helpers');
 const orderRepository = require('../repositories/orderRepository');
 
-function doIt(id, data) {
-  const order = orderRepository.getOrder(id);
-  if (!order) return { ok: false, code: 404, msg: 'Pedido não encontrado' };
+function payOrder(orderId, paymentData) {
+  const order = orderRepository.findById(orderId);
+  if (!order) return { ok: false, status: 404, message: 'Pedido não encontrado' };
 
   if (order.status === 'CREATED') {
     if (order.items.length > 0) {
       const customer = db.customers.find((c) => c.id === order.customerId);
       let total = order.total;
-      const extra = {};
+      const methodDetails = {};
 
-      if (data.method === 'pix') {
+      if (paymentData.method === 'pix') {
         total = total - total * 0.05;
-        extra.pixKey = 'pagamentos@cafeteria.com';
-      } else if (data.method === 'credit_card') {
-        if (!helpers.isValidCard(data.cardNumber)) {
-          return { ok: false, code: 400, msg: 'Cartão inválido' };
+        methodDetails.pixKey = 'pagamentos@cafeteria.com';
+      } else if (paymentData.method === 'credit_card') {
+        if (!helpers.isValidCard(paymentData.cardNumber)) {
+          return { ok: false, status: 400, message: 'Cartão inválido' };
         }
-        const n = data.installments || 1;
-        if (n < 1 || n > 12) {
-          return { ok: false, code: 400, msg: 'Número de parcelas inválido' };
+        const installments = paymentData.installments || 1;
+        if (installments < 1 || installments > 12) {
+          return { ok: false, status: 400, message: 'Número de parcelas inválido' };
         } else {
-          if (n > 1 && total / n < 10) {
-            return { ok: false, code: 400, msg: 'O valor mínimo da parcela é R$ 10,00' };
+          if (installments > 1 && total / installments < 10) {
+            return { ok: false, status: 400, message: 'O valor mínimo da parcela é R$ 10,00' };
           }
-          if (n > 3) {
-            total = total + total * 0.02 * (n - 3);
+          if (installments > 3) {
+            total = total + total * 0.02 * (installments - 3);
           }
         }
-        extra.installments = n;
-        extra.installmentValue = helpers.round(total / n);
-        extra.card = helpers.maskCard(data.cardNumber);
-      } else if (data.method === 'debit_card') {
-        if (!helpers.isValidCard(data.cardNumber)) {
-          return { ok: false, code: 400, msg: 'Cartão inválido' };
+        methodDetails.installments = installments;
+        methodDetails.installmentValue = helpers.roundToCents(total / installments);
+        methodDetails.card = helpers.maskCard(paymentData.cardNumber);
+      } else if (paymentData.method === 'debit_card') {
+        if (!helpers.isValidCard(paymentData.cardNumber)) {
+          return { ok: false, status: 400, message: 'Cartão inválido' };
         }
-        extra.card = helpers.maskCard(data.cardNumber);
-      } else if (data.method === 'cash') {
-        if (data.cashGiven === undefined || data.cashGiven < total) {
-          return { ok: false, code: 400, msg: 'Valor em dinheiro insuficiente' };
+        methodDetails.card = helpers.maskCard(paymentData.cardNumber);
+      } else if (paymentData.method === 'cash') {
+        if (paymentData.cashGiven === undefined || paymentData.cashGiven < total) {
+          return { ok: false, status: 400, message: 'Valor em dinheiro insuficiente' };
         }
-        const change = data.cashGiven - total;
+        const change = paymentData.cashGiven - total;
         if (order.deliveryType === 'delivery' && change > 50) {
-          return { ok: false, code: 400, msg: 'Troco máximo para entrega é de R$ 50,00' };
+          return { ok: false, status: 400, message: 'Troco máximo para entrega é de R$ 50,00' };
         }
-        extra.cashGiven = data.cashGiven;
-        extra.change = helpers.round(change);
+        methodDetails.cashGiven = paymentData.cashGiven;
+        methodDetails.change = helpers.roundToCents(change);
       } else {
-        return { ok: false, code: 400, msg: 'Forma de pagamento inválida' };
+        return { ok: false, status: 400, message: 'Forma de pagamento inválida' };
       }
 
-      total = helpers.round(total);
+      total = helpers.roundToCents(total);
 
       // pontos de fidelidade
       let points = Math.floor(total);
@@ -65,10 +65,10 @@ function doIt(id, data) {
       const payment = {
         id: db.counters.payment++,
         orderId: order.id,
-        method: data.method,
+        method: paymentData.method,
         total,
         points: points,
-        ...extra,
+        ...methodDetails,
         paidAt: helpers.now(),
       };
       db.payments.push(payment);
@@ -77,15 +77,15 @@ function doIt(id, data) {
       order.payment = payment;
       order.history.push({ status: 'PAID', at: payment.paidAt });
 
-      return { ok: true, data: order };
+      return { ok: true, order };
     } else {
-      return { ok: false, code: 400, msg: 'Pedido sem itens' };
+      return { ok: false, status: 400, message: 'Pedido sem itens' };
     }
   } else if (order.status === 'CANCELLED') {
-    return { ok: false, code: 400, msg: 'Pedido cancelado' };
+    return { ok: false, status: 400, message: 'Pedido cancelado' };
   } else {
-    return { ok: false, code: 409, msg: 'Pedido já foi pago' };
+    return { ok: false, status: 409, message: 'Pedido já foi pago' };
   }
 }
 
-module.exports = { doIt };
+module.exports = { payOrder };

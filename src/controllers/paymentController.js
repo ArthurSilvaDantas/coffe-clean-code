@@ -5,9 +5,9 @@ module.exports.pay = function (req, res) {
   if (!body.method) {
     return res.status(400).json({ error: 'Informe a forma de pagamento' });
   }
-  const r = paymentService.doIt(req.params.id, body);
-  if (!r.ok) {
-    return res.status(r.code).json({ error: r.msg });
+  const result = paymentService.payOrder(req.params.id, body);
+  if (!result.ok) {
+    return res.status(result.status).json({ error: result.message });
   }
-  return res.json(r.data);
+  return res.json(result.order);
 };
