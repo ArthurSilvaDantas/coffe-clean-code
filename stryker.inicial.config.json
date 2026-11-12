@@ -1,0 +1,16 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "testRunner": "jest",
+  "jest": { "configFile": "jest.inicial.config.js", "enableFindRelatedTests": false },
+  "mutate": [
+    "src/services/pricingService.js",
+    "src/services/loyaltyService.js",
+    "src/utils/money.js"
+  ],
+  "coverageAnalysis": "perTest",
+  "reporters": ["html", "clear-text", "progress", "json"],
+  "htmlReporter": { "fileName": "reports/mutation/inicial/index.html" },
+  "jsonReporter": { "fileName": "reports/mutation/inicial/mutation.json" },
+  "tempDirName": ".stryker-tmp"
+}

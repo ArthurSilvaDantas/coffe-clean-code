@@ -1,7 +1,7 @@
 {
   "name": "cafeteria-api",
   "version": "1.0.0",
-  "description": "API REST para gerenciamento de pedidos de uma cafeteria",
+  "description": "API REST de pedidos de uma cafeteria: refatoração com clean code e avaliação dos testes com teste de mutação (StrykerJS)",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -10,10 +10,10 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
-  },
-  "jest": {
-    "testEnvironment": "node"
+    "format:check": "prettier --check .",
+    "test:inicial": "jest -c jest.inicial.config.js",
+    "mutacao:inicial": "stryker run stryker.inicial.config.json",
+    "mutacao:final": "stryker run stryker.config.json"
   },
   "license": "MIT",
   "dependencies": {
@@ -21,6 +21,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stryker-mutator/core": "^10.1.1",
+    "@stryker-mutator/jest-runner": "^10.1.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
